@@ -141,6 +141,7 @@ code { background: var(--surface-2); padding: 1px 5px; border-radius: 5px; font-
   padding: 0 4px 6px; text-transform: uppercase; letter-spacing: .04em;
 }
 .day-head .today { color: var(--primary); }
+.day-head .link-btn { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 550; }
 
 .session {
   display: flex; align-items: center; gap: 12px;
@@ -154,6 +155,15 @@ code { background: var(--surface-2); padding: 1px 5px; border-radius: 5px; font-
 .s-main { flex: 1; min-width: 0; }
 .s-name { font-weight: 600; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .s-sub { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.s-time { display: flex; align-items: center; gap: 4px; flex: none; }
+.s-time input {
+  width: 64px; text-align: center; font: inherit; font-variant-numeric: tabular-nums;
+  padding: 6px 4px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
+}
+.s-time input:focus { outline: 2px solid rgba(47,111,237,.25); border-color: var(--primary); }
+.s-time input:disabled { background: var(--surface-2); color: var(--muted); }
+.s-time .sep { color: var(--muted); }
+
 .s-price { display: flex; align-items: center; gap: 6px; }
 .s-price input {
   width: 110px; text-align: right; font: inherit; font-variant-numeric: tabular-nums;
@@ -170,6 +180,7 @@ code { background: var(--surface-2); padding: 1px 5px; border-radius: 5px; font-
 .tag.extra { background: #fff7ed; color: var(--warn); border-color: #fed7aa; }
 .tag.off { background: #fef2f2; color: var(--danger); border-color: #fecaca; }
 .tag.edited { background: #eff6ff; color: var(--primary); border-color: #bfdbfe; }
+.tag.slot { background: #f5f3ff; color: #6d3fd1; border-color: #ddd6fe; }
 
 /* ===== Thẻ lớp học ===== */
 .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
@@ -302,10 +313,24 @@ code { background: var(--surface-2); padding: 1px 5px; border-radius: 5px; font-
   .stats { grid-template-columns: 1fr 1fr; gap: 10px; }
   .stat { padding: 11px 13px; }
   .stat .v { font-size: 19px; }
-  .session { flex-wrap: wrap; }
-  .s-main { flex-basis: 100%; }
-  .s-price { flex: 1; }
+  /* Màn hình hẹp: lưới cố định — tên một dòng, giờ + tiền một dòng, nút một dòng */
+  .session {
+    display: grid;
+    grid-template-columns: auto 1fr 112px;
+    grid-template-areas:
+      "chk  ten   ten"
+      "gio  gio   tien"
+      "nut  nut   nut";
+    column-gap: 10px; row-gap: 10px; align-items: center;
+  }
+  .session > .check { grid-area: chk; }
+  .s-main { grid-area: ten; }
+  .s-time { grid-area: gio; }
+  .s-time input { flex: 1 1 0; width: auto; min-width: 0; }
+  .s-price { grid-area: tien; }
   .s-price input { width: 100%; }
+  .s-actions { grid-area: nut; justify-content: flex-end; gap: 6px; }
+  .s-actions .icon-btn { width: 36px; height: 36px; border: 1px solid var(--border); }
   .field-row { grid-template-columns: 1fr; }
   .invoice-sheet { padding: 20px 18px; }
   .inv-head, .inv-party { flex-direction: column; gap: 10px; }

@@ -104,14 +104,18 @@
 
   function sessionHtml(s) {
     var off = s.status === 'off';
+    var hours = Utils.durationHours(s.startTime, s.endTime);
     var tags = '';
+    if (s.slot) tags += '<span class="tag slot">Ca ' + s.slot + '/' + s.slotCount + '</span>';
     if (s.isExtra) tags += '<span class="tag extra">Dạy thêm</span>';
     if (off) tags += '<span class="tag off">Nghỉ</span>';
+    if (s.timeEdited && !off) tags += '<span class="tag edited">Giờ riêng</span>';
     if (s.priceEdited && !off) tags += '<span class="tag edited">Giá riêng</span>';
-    var time = (s.startTime && s.endTime) ? s.startTime + ' – ' + s.endTime : 'Chưa đặt giờ';
-    var sub = [time];
+    var sub = [];
+    if (hours) sub.push(Utils.formatHours(hours));
     if (s.student) sub.push(s.student);
     if (s.note) sub.push(s.note);
+    var daSua = (s.timeEdited || s.priceEdited) && !s.isExtra;
 
     return '<div class="session' + (off ? ' is-off' : '') +
         (view.selected.has(s.key) ? ' is-sel' : '') + '" style="--c:' + E(s.color) + '">' +
@@ -119,20 +123,27 @@
         (view.selected.has(s.key) ? ' checked' : '') + '></label>' +
       '<div class="s-main">' +
         '<div class="s-name">' + E(s.className) + tags + '</div>' +
-        '<div class="s-sub">' + E(sub.join(' · ')) + '</div>' +
+        (sub.length ? '<div class="s-sub">' + E(sub.join(' · ')) + '</div>' : '') +
+      '</div>' +
+      '<div class="s-time">' +
+        '<input class="time" value="' + E(s.startTime) + '" data-tstart="' + E(s.key) +
+          '" aria-label="Giờ bắt đầu"' + (off ? ' disabled' : '') + '>' +
+        '<span class="sep">–</span>' +
+        '<input class="time" value="' + E(s.endTime) + '" data-tend="' + E(s.key) +
+          '" aria-label="Giờ kết thúc"' + (off ? ' disabled' : '') + '>' +
       '</div>' +
       '<div class="s-price">' +
-        '<input class="money" value="' + Utils.formatMoney(s.price) + '" data-price="' + E(s.key) + '"' +
-          (off ? ' disabled' : '') + '><span class="unit">đ</span>' +
+        '<input class="money" value="' + Utils.formatMoney(s.price) + '" data-price="' + E(s.key) +
+          '" aria-label="Giá buổi này"' + (off ? ' disabled' : '') + '><span class="unit">đ</span>' +
       '</div>' +
       '<div class="s-actions">' +
-        (s.priceEdited && !s.isExtra ? '<button class="icon-btn" data-resetprice="' + E(s.key) +
-          '" title="Dùng lại giá mặc định của lớp">⟲</button>' : '') +
+        (daSua ? '<button class="icon-btn" data-reset="' + E(s.key) +
+          '" title="Bỏ chỉnh riêng, dùng lại giờ và giá của lớp">⟲</button>' : '') +
         '<button class="icon-btn" data-toggle="' + E(s.key) + '" title="' +
           (off ? 'Đánh dấu đã dạy' : 'Đánh dấu nghỉ buổi này') + '">' + (off ? '↺' : '⊘') + '</button>' +
         '<button class="icon-btn" data-bill="' + E(s.key) + '" title="Xuất bill riêng buổi này">🧾</button>' +
         (s.isExtra ? '<button class="icon-btn" data-delextra="' + E(s.extraId) +
-          '" title="Xoá buổi dạy thêm">🗑</button>' : '') +
+          '" title="Xoá ca dạy thêm này">🗑</button>' : '') +
       '</div>' +
     '</div>';
   }
@@ -168,7 +179,9 @@
         html += '<div class="day-group"><div class="day-head">' +
           '<span' + (s.date === today ? ' class="today"' : '') + '>' +
           E(Utils.weekdayName(s.date)) + ', ' + Utils.formatDate(s.date) + '</span>' +
-          (s.date === today ? '<span class="today">• Hôm nay</span>' : '') + '</div>';
+          (s.date === today ? '<span class="today">• Hôm nay</span>' : '') +
+          '<button class="link-btn" data-addslot="' + E(s.date) +
+            '" title="Thêm một ca dạy nữa trong ngày này">+ thêm giờ</button>' + '</div>';
         lastDate = s.date;
       }
       html += sessionHtml(s);
@@ -193,23 +206,59 @@
     $('#billSelected').disabled = n === 0;
   }
 
+  /* Ghi thay đổi về đúng nơi: buổi dạy thêm sửa thẳng, buổi theo lịch ghi dạng ghi đè */
+  function patchSession(s, patch) {
+    if (s.isExtra) {
+      var ex = Store.get().extras.find(function (x) { return x.id === s.extraId; });
+      if (!ex) return;
+      Object.assign(ex, patch);
+      Store.save();
+    } else {
+      Store.setOverride(s.classId, s.date, patch);
+    }
+  }
+
+  function findSession(key) {
+    return currentSessions().find(function (x) { return x.key === key; });
+  }
+
   $('#sessionList').addEventListener('change', function (e) {
     var t = e.target;
+
     if (t.dataset.sel) {
       if (t.checked) view.selected.add(t.dataset.sel); else view.selected.delete(t.dataset.sel);
       t.closest('.session').classList.toggle('is-sel', t.checked);
       syncSelectionUI(currentSessions());
+      return;
     }
+
     if (t.dataset.price) {
-      var key = t.dataset.price;
-      var price = Utils.parseMoney(t.value);
-      var s = currentSessions().find(function (x) { return x.key === key; });
-      if (!s) return;
-      if (s.isExtra) {
-        var ex = Store.get().extras.find(function (x) { return x.id === s.extraId; });
-        if (ex) { ex.price = price; Store.save(); }
+      var s = findSession(t.dataset.price);
+      if (s) { patchSession(s, { price: Utils.parseMoney(t.value) }); renderSessions(); }
+      return;
+    }
+
+    if (t.dataset.tstart || t.dataset.tend) {
+      var key = t.dataset.tstart || t.dataset.tend;
+      var field = t.dataset.tstart ? 'startTime' : 'endTime';
+      var ss = findSession(key);
+      if (!ss) return;
+      var raw = t.value.trim();
+      var patch = {};
+
+      if (!raw) {
+        /* Xoá trống = dùng lại giờ của lớp */
+        patch[field] = '';
       } else {
-        Store.setOverride(s.classId, s.date, { price: price });
+        var val = Utils.normalizeTime(raw);
+        if (!val) { toast('Giờ không hợp lệ. Ví dụ: 18:00 hoặc 6h30.'); renderSessions(); return; }
+        patch[field] = val;
+      }
+      patchSession(ss, patch);
+
+      var sau = findSession(key);
+      if (sau && sau.startTime && sau.endTime && sau.endTime <= sau.startTime) {
+        toast('Giờ kết thúc không sau giờ bắt đầu — kiểm tra lại nhé.');
       }
       renderSessions();
     }
@@ -221,17 +270,23 @@
     var all = currentSessions();
     var find = function (key) { return all.find(function (x) { return x.key === key; }); };
 
-    if (btn.dataset.toggle) {
+    if (btn.dataset.addslot) {
+      openExtraModal(btn.dataset.addslot);
+    } else if (btn.dataset.toggle) {
       var s = find(btn.dataset.toggle);
       if (!s) return;
-      if (s.isExtra) { toast('Buổi dạy thêm: xoá nếu không dạy nữa.'); return; }
+      if (s.isExtra) { toast('Ca dạy thêm: xoá bằng nút 🗑 nếu không dạy nữa.'); return; }
       Store.setOverride(s.classId, s.date, { status: s.status === 'off' ? 'teach' : 'off' });
       renderSessions();
-    } else if (btn.dataset.resetprice) {
-      var r = find(btn.dataset.resetprice);
-      if (r) { Store.setOverride(r.classId, r.date, { price: '' }); renderSessions(); toast('Đã dùng lại giá của lớp.'); }
+    } else if (btn.dataset.reset) {
+      var r = find(btn.dataset.reset);
+      if (r) {
+        Store.setOverride(r.classId, r.date, { price: '', startTime: '', endTime: '' });
+        renderSessions();
+        toast('Đã dùng lại giờ và giá của lớp.');
+      }
     } else if (btn.dataset.delextra) {
-      if (confirm('Xoá buổi dạy thêm này?')) { Store.removeExtra(btn.dataset.delextra); renderSessions(); }
+      if (confirm('Xoá ca dạy thêm này?')) { Store.removeExtra(btn.dataset.delextra); renderSessions(); }
     } else if (btn.dataset.bill) {
       var b = find(btn.dataset.bill);
       if (b) showBill(Invoice.single([b], { period: Utils.weekdayName(b.date) + ', ' + Utils.formatDate(b.date) }), [b]);
@@ -436,29 +491,50 @@
 
   /* ===================== Buổi dạy thêm ===================== */
 
-  $('#addExtraBtn').addEventListener('click', function () {
+  /* Gợi ý khung giờ: nối tiếp ca cuối cùng của lớp đó trong ngày, dài bằng ca thường */
+  function suggestSlot(classId, date) {
+    var cls = Store.classById(classId);
+    if (!cls) return { start: '', end: '' };
+    var dai = Utils.durationHours(cls.startTime, cls.endTime) * 60 || 90;
+    var trongNgay = Store.sessionsInMonth(
+      Number(date.slice(0, 4)), Number(date.slice(5, 7)), classId
+    ).filter(function (x) { return x.date === date; });
+
+    if (!trongNgay.length) return { start: cls.startTime, end: cls.endTime };
+    var cuoi = trongNgay[trongNgay.length - 1];
+    var start = cuoi.endTime || cls.endTime;
+    return { start: start, end: Utils.addMinutes(start, dai) };
+  }
+
+  function fillSlotSuggestion() {
+    var g = suggestSlot($('#exClass').value, $('#exDate').value);
+    $('#exStart').value = g.start;
+    $('#exEnd').value = g.end;
+  }
+
+  function openExtraModal(date) {
     var classes = Store.get().classes;
     if (!classes.length) { toast('Tạo lớp trước đã nhé.'); return; }
     $('#exClass').innerHTML = classes.map(function (c) {
       return '<option value="' + E(c.id) + '">' + E(c.name) + '</option>';
     }).join('');
     if (view.classId) $('#exClass').value = view.classId;
-    var d = new Date();
-    var isCurrent = d.getFullYear() === view.year && d.getMonth() + 1 === view.month;
-    $('#exDate').value = isCurrent ? Utils.todayISO()
-      : view.year + '-' + Utils.pad(view.month) + '-01';
-    var cls = Store.classById($('#exClass').value);
-    $('#exStart').value = cls ? cls.startTime : '';
-    $('#exEnd').value = cls ? cls.endTime : '';
+
+    if (!date) {
+      var d = new Date();
+      var isCurrent = d.getFullYear() === view.year && d.getMonth() + 1 === view.month;
+      date = isCurrent ? Utils.todayISO() : view.year + '-' + Utils.pad(view.month) + '-01';
+    }
+    $('#exDate').value = date;
+    fillSlotSuggestion();
     $('#exPrice').value = '';
     $('#exNote').value = '';
     openModal('#extraModal');
-  });
+  }
 
-  $('#exClass').addEventListener('change', function () {
-    var cls = Store.classById(this.value);
-    if (cls) { $('#exStart').value = cls.startTime; $('#exEnd').value = cls.endTime; }
-  });
+  $('#addExtraBtn').addEventListener('click', function () { openExtraModal(null); });
+  $('#exClass').addEventListener('change', fillSlotSuggestion);
+  $('#exDate').addEventListener('change', fillSlotSuggestion);
 
   $('#saveExtra').addEventListener('click', function () {
     var classId = $('#exClass').value;
@@ -476,7 +552,7 @@
     var d = Utils.fromISO(date);
     view.year = d.getFullYear(); view.month = d.getMonth() + 1;
     renderAll();
-    toast('Đã thêm buổi ' + Utils.formatDate(date) + '.');
+    toast('Đã thêm ca ngày ' + Utils.formatDate(date) + '.');
   });
 
   /* ===================== Cài đặt ===================== */

@@ -165,12 +165,15 @@ var Store = (function () {
       date: date,
       startTime: (extra && extra.startTime) || (ov && ov.startTime) || cls.startTime,
       endTime: (extra && extra.endTime) || (ov && ov.endTime) || cls.endTime,
+      /* buổi dạy thêm vốn đã có giờ riêng, chỉ đánh dấu khi lệch lịch cố định */
+      timeEdited: !extra && !!(ov && (ov.startTime || ov.endTime)),
       price: Number(price) || 0,
       priceEdited: priceEdited,
       status: extra ? 'teach' : ((ov && ov.status) || 'teach'),
       note: (extra && extra.note) || (ov && ov.note) || '',
       isExtra: !!extra,
-      extraId: extra ? extra.id : null
+      extraId: extra ? extra.id : null,
+      slot: 0, slotCount: 1
     };
   }
 
@@ -207,6 +210,18 @@ var Store = (function () {
       if (a.date !== b.date) return a.date < b.date ? -1 : 1;
       if (a.startTime !== b.startTime) return a.startTime < b.startTime ? -1 : 1;
       return a.className.localeCompare(b.className, 'vi');
+    });
+
+    /* Một lớp dạy nhiều ca trong cùng ngày thì đánh số ca để hóa đơn khỏi lẫn */
+    var byDay = {};
+    out.forEach(function (ss) {
+      var k = ss.classId + '|' + ss.date;
+      (byDay[k] = byDay[k] || []).push(ss);
+    });
+    Object.keys(byDay).forEach(function (k) {
+      var list = byDay[k];
+      if (list.length < 2) return;
+      list.forEach(function (ss, i) { ss.slot = i + 1; ss.slotCount = list.length; });
     });
     return out;
   }

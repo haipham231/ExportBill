@@ -56,12 +56,29 @@ dùng lại được cho mọi tháng, không gắn sẵn số tiền nên phụ
 
 ## Điều chỉnh từng buổi
 
-- **Sửa giá một buổi** — gõ thẳng vào ô tiền trên dòng đó. Gõ tắt được: `500k`, `1tr2`, `1,5tr`.
-  Buổi đã sửa có nhãn *Giá riêng*; bấm ⟲ để quay lại giá của lớp.
+Mỗi dòng trong tab **Lịch & Hóa đơn** đều sửa trực tiếp được — không cần mở hộp thoại nào.
+
+- **Đổi giờ một buổi** — gõ thẳng vào hai ô giờ. Hiểu cả `8h`, `18h30`, `7:30`.
+  Buổi lệch lịch cố định có nhãn *Giờ riêng*, và số giờ bên dưới tên lớp tự tính lại.
+- **Đổi giá một buổi** — gõ vào ô tiền. Gõ tắt được: `500k`, `1tr2`, `1,5tr`.
+  Buổi đã sửa có nhãn *Giá riêng*.
+- **Bỏ chỉnh riêng** — bấm ⟲ để buổi đó quay về đúng giờ và giá của lớp.
 - **Nghỉ một buổi** — bấm ⊘. Buổi đó không tính tiền, vẫn được ghi chú ở cuối hóa đơn.
-- **Dạy thêm / dạy bù** — nút **+ Buổi dạy thêm**, chọn ngày bất kỳ ngoài lịch cố định.
 - **Lớp học theo giai đoạn** — đặt *Bắt đầu từ ngày* / *Kết thúc ngày* để lịch chỉ sinh
   trong khoảng đó. Lớp đã nghỉ hẳn thì bấm **Tạm ngưng**.
+
+### Nhiều ca trong một ngày
+
+Bấm **+ thêm giờ** ở tiêu đề ngày để thêm một ca nữa cho đúng ngày đó — giờ bắt đầu được
+gợi ý nối tiếp ca trước, dài bằng ca thường, và ca mới đặt giá riêng được (để trống thì
+lấy giá của lớp).
+
+Ngày có từ hai ca trở lên sẽ được đánh số **Ca 1/2**, **Ca 2/2**… cả trên màn hình lẫn
+trên hóa đơn, nên phụ huynh nhìn là biết ngày đó học mấy ca, mỗi ca từ mấy giờ tới mấy
+giờ và bao nhiêu tiền. Chân bảng hóa đơn ghi cả *Tổng số buổi* và *Tổng số giờ*.
+
+Nút **+ Ca dạy thêm** ở thanh trên cùng làm việc tương tự nhưng cho ngày bất kỳ
+(tiện khi dạy bù vào ngày không có trong lịch cố định).
 
 ## Sao lưu
 

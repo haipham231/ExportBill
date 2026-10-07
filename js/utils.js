@@ -49,6 +49,20 @@ var Utils = (function () {
     return mins / 60;
   }
 
+  /* 1.5 -> "1.5h", 2 -> "2h" */
+  function formatHours(h) {
+    if (!h) return '';
+    return (Math.round(h * 100) / 100) + 'h';
+  }
+
+  /* "19:30" + 90 -> "21:00" */
+  function addMinutes(t, mins) {
+    if (!t) return '';
+    var p = t.split(':').map(Number);
+    var total = ((p[0] * 60 + p[1] + mins) % 1440 + 1440) % 1440;
+    return pad(Math.floor(total / 60)) + ':' + pad(total % 60);
+  }
+
   function formatMoney(n) {
     return Math.round(Number(n) || 0).toLocaleString('vi-VN');
   }
@@ -130,6 +144,7 @@ var Utils = (function () {
     pad: pad, toISO: toISO, fromISO: fromISO, todayISO: todayISO,
     formatDate: formatDate, weekdayOf: weekdayOf, weekdayName: weekdayName,
     daysInMonth: daysInMonth, normalizeTime: normalizeTime, durationHours: durationHours,
+    formatHours: formatHours, addMinutes: addMinutes,
     formatMoney: formatMoney, parseMoney: parseMoney, docSoTien: docSoTien,
     uid: uid, escapeHtml: escapeHtml
   };

@@ -41,14 +41,21 @@ var Invoice = (function () {
     return prefix + '-' + stamp + suffix;
   }
 
+  function totalHours(sessions) {
+    return billable(sessions).reduce(function (h, s) {
+      return h + Utils.durationHours(s.startTime, s.endTime);
+    }, 0);
+  }
+
   function rowsHtml(sessions, showClass) {
     return sessions.map(function (s, i) {
       var hours = Utils.durationHours(s.startTime, s.endTime);
       var time = s.startTime && s.endTime
-        ? s.startTime + ' – ' + s.endTime + (hours ? ' (' + (hours % 1 ? hours.toFixed(1) : hours) + 'h)' : '')
+        ? s.startTime + ' – ' + s.endTime + (hours ? ' (' + Utils.formatHours(hours) + ')' : '')
         : '—';
       var desc = [];
-      if (s.isExtra) desc.push('Buổi dạy thêm');
+      if (s.slot) desc.push('Ca ' + s.slot + '/' + s.slotCount);
+      if (s.isExtra) desc.push('Dạy thêm');
       if (s.note) desc.push(s.note);
       return '<tr>' +
         '<td class="c">' + (i + 1) + '</td>' +
@@ -107,7 +114,8 @@ var Invoice = (function () {
           '<tbody>' + (list.length ? rowsHtml(list, showClass) :
             '<tr><td colspan="' + (showClass ? 6 : 5) + '" class="c muted">Không có buổi nào</td></tr>') + '</tbody>' +
           '<tfoot><tr>' +
-            '<td colspan="' + (showClass ? 4 : 3) + '" class="r">Tổng số buổi: <b>' + list.length + '</b></td>' +
+            '<td colspan="' + (showClass ? 4 : 3) + '" class="r">Tổng số buổi: <b>' + list.length +
+              '</b> · Tổng số giờ: <b>' + Utils.formatHours(totalHours(sessions)) + '</b></td>' +
             '<td class="r">TỔNG CỘNG</td>' +
             '<td class="r total">' + Utils.formatMoney(total) + ' đ</td>' +
           '</tr></tfoot>' +
@@ -180,12 +188,13 @@ var Invoice = (function () {
   /* ---------- CSV ---------- */
 
   function csv(sessions) {
-    var head = ['Ngày', 'Thứ', 'Lớp', 'Học viên', 'Bắt đầu', 'Kết thúc', 'Số giờ', 'Đơn giá', 'Thành tiền', 'Trạng thái', 'Ghi chú'];
+    var head = ['Ngày', 'Thứ', 'Ca', 'Lớp', 'Học viên', 'Bắt đầu', 'Kết thúc', 'Số giờ', 'Đơn giá', 'Thành tiền', 'Trạng thái', 'Ghi chú'];
     var rows = sessions.map(function (s) {
       var money = s.status === 'off' ? 0 : s.price;
       return [
         Utils.formatDate(s.date),
         Utils.weekdayName(s.date),
+        s.slot ? s.slot + '/' + s.slotCount : '',
         s.className,
         s.student,
         s.startTime, s.endTime,
@@ -196,7 +205,7 @@ var Invoice = (function () {
       ];
     });
     rows.push([]);
-    rows.push(['', '', '', '', '', '', 'TỔNG CỘNG', '', totalOf(sessions), '', '']);
+    rows.push(['', '', '', '', '', '', '', totalHours(sessions), 'TỔNG CỘNG', totalOf(sessions), '', '']);
     return [head].concat(rows).map(function (r) {
       return r.map(function (v) {
         var str = String(v === null || v === undefined ? '' : v);
@@ -219,6 +228,6 @@ var Invoice = (function () {
 
   return {
     single: single, perClass: perClass, csv: csv, download: download, invoiceNo: invoiceNo,
-    totalOf: totalOf, billable: billable, periodLabel: periodLabel
+    totalOf: totalOf, billable: billable, periodLabel: periodLabel, totalHours: totalHours
   };
 })();
