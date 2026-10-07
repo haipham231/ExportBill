@@ -9,7 +9,8 @@
     classId: '',
     selected: new Set(),
     editingClassId: null,
-    billSessions: []
+    billCtx: null,
+    noteKey: null
   };
 
   /* Thứ 2..Chủ nhật, map sang Date.getDay() */
@@ -130,6 +131,7 @@
       '<div class="s-main">' +
         '<div class="s-name">' + E(s.className) + tags + '</div>' +
         (sub.length ? '<div class="s-sub">' + E(sub.join(' · ')) + '</div>' : '') +
+        (s.comment ? '<div class="s-comment">💬 ' + E(s.comment) + '</div>' : '') +
       '</div>' +
       '<div class="s-time">' +
         '<input class="time" value="' + E(s.startTime) + '" data-tstart="' + E(s.key) +
@@ -147,6 +149,8 @@
           '" title="Bỏ chỉnh riêng, dùng lại giờ và giá của lớp">⟲</button>' : '') +
         '<button class="icon-btn" data-toggle="' + E(s.key) + '" title="' +
           (off ? 'Đánh dấu đã dạy' : 'Đánh dấu nghỉ buổi này') + '">' + (off ? '↺' : '⊘') + '</button>' +
+        '<button class="icon-btn' + (s.comment ? ' has-note' : '') + '" data-note="' + E(s.key) +
+          '" title="' + (s.comment ? 'Sửa nhận xét buổi này' : 'Viết nhận xét cho bé buổi này') + '">💬</button>' +
         '<button class="icon-btn" data-bill="' + E(s.key) + '" title="Xuất bill riêng buổi này">🧾</button>' +
         (s.isExtra ? '<button class="icon-btn" data-delextra="' + E(s.extraId) +
           '" title="Xoá ca dạy thêm này">🗑</button>' : '') +
@@ -293,10 +297,82 @@
       }
     } else if (btn.dataset.delextra) {
       if (confirm('Xoá ca dạy thêm này?')) { Store.removeExtra(btn.dataset.delextra); renderSessions(); }
+    } else if (btn.dataset.note) {
+      var n = find(btn.dataset.note);
+      if (n) openNoteModal(n);
     } else if (btn.dataset.bill) {
       var b = find(btn.dataset.bill);
-      if (b) showBill(Invoice.single([b], { period: Utils.weekdayName(b.date) + ', ' + Utils.formatDate(b.date) }), [b]);
+      if (b) showBill('single', [b], { period: Utils.weekdayName(b.date) + ', ' + Utils.formatDate(b.date) });
     }
+  });
+
+  /* ===================== Nhận xét ===================== */
+
+  function openNoteModal(s) {
+    view.noteKey = s.key;
+    $('#noteWhen').textContent = s.className + ' — ' + Utils.weekdayName(s.date) + ', ' +
+      Utils.formatDate(s.date) + ' · ' + s.startTime + '–' + s.endTime +
+      (s.slot ? ' (ca ' + s.slot + '/' + s.slotCount + ')' : '');
+    $('#noteText').value = s.comment || '';
+    openModal('#noteModal');
+    $('#noteText').focus();
+  }
+
+  $('#saveNote').addEventListener('click', function () {
+    var s = findSession(view.noteKey);
+    if (!s) { closeModal('#noteModal'); return; }
+    patchSession(s, { comment: $('#noteText').value.trim() });
+    closeModal('#noteModal');
+    renderSessions();
+    toast('Đã lưu nhận xét.');
+  });
+
+  function thangHienTai() { return view.year + '-' + Utils.pad(view.month); }
+
+  function renderLevelPicker(chon) {
+    $('#rvLevels').innerHTML = Store.REVIEW_LEVELS.map(function (m) {
+      var on = m === chon;
+      return '<button type="button" class="wd wide' + (on ? ' on' : '') +
+        '" data-level="' + E(m) + '" aria-pressed="' + on + '">' + E(m) + '</button>';
+    }).join('');
+  }
+
+  $('#rvLevels').addEventListener('click', function (e) {
+    var el = e.target.closest('.wd');
+    if (!el) return;
+    var dangBat = el.classList.contains('on');
+    renderLevelPicker(dangBat ? '' : el.dataset.level);   // bấm lại để bỏ chọn
+  });
+
+  function napReview() {
+    var rv = Store.getReview($('#rvClass').value, thangHienTai());
+    renderLevelPicker(rv ? rv.level : '');
+    $('#rvText').value = rv ? rv.text : '';
+  }
+
+  $('#monthReviewBtn').addEventListener('click', function () {
+    var classes = Store.get().classes;
+    if (!classes.length) { toast('Tạo lớp trước đã nhé.'); return; }
+    $('#rvClass').innerHTML = classes.map(function (c) {
+      return '<option value="' + E(c.id) + '">' + E(c.name) + '</option>';
+    }).join('');
+    if (view.classId) $('#rvClass').value = view.classId;
+    $('#reviewTitle').textContent = 'Nhận xét tháng ' + view.month + '/' + view.year;
+    napReview();
+    openModal('#reviewModal');
+  });
+
+  $('#rvClass').addEventListener('change', napReview);
+
+  $('#saveReview').addEventListener('click', function () {
+    var el = document.querySelector('#rvLevels .wd.on');
+    Store.setReview($('#rvClass').value, thangHienTai(), {
+      text: $('#rvText').value,
+      level: el ? el.dataset.level : ''
+    });
+    closeModal('#reviewModal');
+    renderSessions();
+    toast('Đã lưu nhận xét tháng.');
   });
 
   $('#checkAll').addEventListener('change', function () {
@@ -338,28 +414,40 @@
 
   function monthPeriod() { return 'Tháng ' + view.month + '/' + view.year; }
 
-  function showBill(html, sessions) {
-    view.billSessions = sessions;
-    $('#billArea').innerHTML = html;
+  /* Giữ lại ngữ cảnh để bật/tắt "Kèm nhận xét" là vẽ lại được ngay */
+  function showBill(kind, sessions, opts) {
+    view.billCtx = { kind: kind, sessions: sessions, opts: opts || {} };
+    renderBillArea();
     openModal('#billModal');
   }
+
+  function renderBillArea() {
+    var ctx = view.billCtx;
+    if (!ctx) return;
+    var opts = Object.assign({}, ctx.opts, { withReview: $('#billWithReview').checked });
+    $('#billArea').innerHTML = ctx.kind === 'perClass'
+      ? Invoice.perClass(ctx.sessions, opts)
+      : Invoice.single(ctx.sessions, opts);
+  }
+
+  $('#billWithReview').addEventListener('change', renderBillArea);
 
   $('#billSelected').addEventListener('click', function () {
     var sel = selectedSessions();
     if (!sel.length) { toast('Chưa chọn buổi nào.'); return; }
-    showBill(Invoice.single(sel, { period: Invoice.periodLabel(sel) }), sel);
+    showBill('single', sel, { period: Invoice.periodLabel(sel) });
   });
 
   $('#billMonth').addEventListener('click', function () {
     var sessions = currentSessions();
     if (!sessions.length) { toast('Tháng này chưa có buổi nào.'); return; }
-    showBill(Invoice.single(sessions, { period: monthPeriod() }), sessions);
+    showBill('single', sessions, { period: monthPeriod() });
   });
 
   $('#billPerClass').addEventListener('click', function () {
     var sessions = view.selected.size ? selectedSessions() : currentSessions();
     if (!sessions.length) { toast('Chưa có buổi nào để xuất.'); return; }
-    showBill(Invoice.perClass(sessions, { period: view.selected.size ? null : monthPeriod() }), sessions);
+    showBill('perClass', sessions, { period: view.selected.size ? null : monthPeriod() });
   });
 
   $('#exportCsv').addEventListener('click', function () {
@@ -372,7 +460,7 @@
   $('#billPrint').addEventListener('click', function () { window.print(); });
   $('#billCsv').addEventListener('click', function () {
     Invoice.download('hoa-don-' + view.year + '-' + Utils.pad(view.month) + '.csv',
-      Invoice.csv(view.billSessions), 'text/csv');
+      Invoice.csv(view.billCtx ? view.billCtx.sessions : []), 'text/csv');
     toast('Đã tải file CSV.');
   });
 

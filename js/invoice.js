@@ -69,7 +69,36 @@ var Invoice = (function () {
     }).join('');
   }
 
-  /* Dựng một tờ hóa đơn. meta: { title, invoiceNo, period, payerName, payerNote } */
+  /* Nhận xét cả tháng chỉ gắn được khi tờ bill thuộc đúng một lớp và đúng một tháng */
+  function monthReview(sessions) {
+    var ids = [], thangs = [];
+    sessions.forEach(function (s) {
+      if (ids.indexOf(s.classId) === -1) ids.push(s.classId);
+      var t = s.date.slice(0, 7);
+      if (thangs.indexOf(t) === -1) thangs.push(t);
+    });
+    if (ids.length !== 1 || thangs.length !== 1) return null;
+    return Store.getReview(ids[0], thangs[0]);
+  }
+
+  function reviewHtml(sessions) {
+    var chung = monthReview(sessions);
+    var tungBuoi = billable(sessions).filter(function (s) { return s.comment; });
+    if (!chung && !tungBuoi.length) return '';
+
+    return '<div class="inv-review">' +
+      '<div class="lbl">NHẬN XÉT CỦA GIÁO VIÊN</div>' +
+      (chung && chung.level ? '<div class="rv-level">Xếp loại: <b>' + E(chung.level) + '</b></div>' : '') +
+      (chung && chung.text ? '<p class="rv-text">' + E(chung.text).replace(/\n/g, '<br>') + '</p>' : '') +
+      (tungBuoi.length ? '<table class="rv-list">' + tungBuoi.map(function (s) {
+        return '<tr><td class="rv-day">' + Utils.formatDate(s.date) +
+          (s.slot ? ' <span class="rv-ca">ca ' + s.slot + '</span>' : '') + '</td>' +
+          '<td>' + E(s.comment) + '</td></tr>';
+      }).join('') + '</table>' : '') +
+    '</div>';
+  }
+
+  /* Dựng một tờ hóa đơn. meta: { title, invoiceNo, period, payerName, payerNote, withReview } */
   function sheetHtml(sessions, meta) {
     var st = Store.get().settings;
     var list = billable(sessions);
@@ -126,6 +155,8 @@ var Invoice = (function () {
         (skipped.length ? '<div class="inv-note">Các buổi nghỉ không tính phí: ' +
           E(skipped.map(function (s) { return Utils.formatDate(s.date); }).join(', ')) + '</div>' : '') +
 
+        (meta.withReview === false ? '' : reviewHtml(sessions)) +
+
         (st.bankInfo || st.qrImage ?
           '<div class="inv-bank">' +
             (st.bankInfo ? '<div class="inv-bank-text">' +
@@ -160,7 +191,8 @@ var Invoice = (function () {
       invoiceNo: opts.invoiceNo || invoiceNo(sessions),
       period: opts.period || periodLabel(sessions),
       payerName: names.join(' · ') || '—',
-      payerNote: opts.payerNote || ''
+      payerNote: opts.payerNote || '',
+      withReview: opts.withReview
     });
   }
 
@@ -180,7 +212,8 @@ var Invoice = (function () {
         invoiceNo: invoiceNo(g),
         period: opts.period || periodLabel(g),
         payerName: g[0].className + (g[0].student ? ' (' + g[0].student + ')' : ''),
-        payerNote: opts.payerNote || ''
+        payerNote: opts.payerNote || '',
+        withReview: opts.withReview
       });
     }).join('');
   }
@@ -188,7 +221,7 @@ var Invoice = (function () {
   /* ---------- CSV ---------- */
 
   function csv(sessions) {
-    var head = ['Ngày', 'Thứ', 'Ca', 'Lớp', 'Học viên', 'Bắt đầu', 'Kết thúc', 'Số giờ', 'Đơn giá', 'Thành tiền', 'Trạng thái', 'Ghi chú'];
+    var head = ['Ngày', 'Thứ', 'Ca', 'Lớp', 'Học viên', 'Bắt đầu', 'Kết thúc', 'Số giờ', 'Đơn giá', 'Thành tiền', 'Trạng thái', 'Ghi chú', 'Nhận xét'];
     var rows = sessions.map(function (s) {
       var money = s.status === 'off' ? 0 : s.price;
       return [
@@ -201,11 +234,12 @@ var Invoice = (function () {
         Utils.durationHours(s.startTime, s.endTime),
         s.price, money,
         s.status === 'off' ? 'Nghỉ' : (s.isExtra ? 'Dạy thêm' : 'Đã dạy'),
-        s.note
+        s.note,
+        s.comment
       ];
     });
     rows.push([]);
-    rows.push(['', '', '', '', '', '', '', totalHours(sessions), 'TỔNG CỘNG', totalOf(sessions), '', '']);
+    rows.push(['', '', '', '', '', '', '', totalHours(sessions), 'TỔNG CỘNG', totalOf(sessions), '', '', '']);
     return [head].concat(rows).map(function (r) {
       return r.map(function (v) {
         var str = String(v === null || v === undefined ? '' : v);
@@ -228,6 +262,7 @@ var Invoice = (function () {
 
   return {
     single: single, perClass: perClass, csv: csv, download: download, invoiceNo: invoiceNo,
-    totalOf: totalOf, billable: billable, periodLabel: periodLabel, totalHours: totalHours
+    totalOf: totalOf, billable: billable, periodLabel: periodLabel, totalHours: totalHours,
+    monthReview: monthReview
   };
 })();

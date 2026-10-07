@@ -19,7 +19,9 @@ var Store = (function () {
       /* key "classId|YYYY-MM-DD" -> { status, price, startTime, endTime, note } */
       overrides: {},
       /* buổi dạy thêm / dạy bù nằm ngoài lịch cố định */
-      extras: []
+      extras: [],
+      /* nhận xét chung cả tháng, khoá "lopId|YYYY-MM" */
+      reviews: {}
     };
   }
 
@@ -239,6 +241,8 @@ var Store = (function () {
       priceEdited: priceEdited,
       status: extra ? 'teach' : ((ov && ov.status) || 'teach'),
       note: (extra && extra.note) || (ov && ov.note) || '',
+      /* nhận xét của giáo viên về buổi học này */
+      comment: (extra && extra.comment) || (ov && ov.comment) || '',
       isExtra: !!extra,
       extraId: extra ? extra.id : null,
       slot: 0, slotCount: 1
@@ -296,6 +300,27 @@ var Store = (function () {
     return out;
   }
 
+  /* ---------- Nhận xét cả tháng ---------- */
+
+  var MUC_DO = ['Tốt', 'Khá', 'Trung bình', 'Cần cố gắng'];
+
+  function reviewKey(classId, thang) { return classId + '|' + thang; }
+
+  /* thang: "YYYY-MM" */
+  function getReview(classId, thang) {
+    return get().reviews[reviewKey(classId, thang)] || null;
+  }
+
+  function setReview(classId, thang, data) {
+    var s = get();
+    var k = reviewKey(classId, thang);
+    var text = (data.text || '').trim();
+    var level = data.level || '';
+    if (!text && !level) delete s.reviews[k];
+    else s.reviews[k] = { text: text, level: level };
+    save();
+  }
+
   /* ---------- Sao lưu ---------- */
 
   function exportJSON() { return JSON.stringify(get(), null, 2); }
@@ -320,6 +345,7 @@ var Store = (function () {
     addExtra: addExtra, removeExtra: removeExtra,
     sessionsInMonth: sessionsInMonth,
     exportJSON: exportJSON, importJSON: importJSON, resetAll: resetAll,
-    newSlot: newSlot, sortSlots: sortSlots, slotPrice: slotPrice, WEEKDAY_ORDER: THU_TU
+    newSlot: newSlot, sortSlots: sortSlots, slotPrice: slotPrice, WEEKDAY_ORDER: THU_TU,
+    getReview: getReview, setReview: setReview, REVIEW_LEVELS: MUC_DO
   };
 })();

@@ -50,6 +50,20 @@ rồi mở http://localhost:8787
 Ở cửa sổ xem trước, bấm **In / Lưu PDF** → trong hộp thoại in chọn
 *Đích đến: Lưu thành PDF* (Save as PDF).
 
+## Nhận xét cho bé
+
+Hai mức, đều in kèm ở cuối hóa đơn:
+
+- **Từng buổi** — bấm 💬 trên dòng buổi đó. Nhận xét hiện ngay dưới tên lớp trong lịch,
+  và lên hóa đơn thành một dòng kèm ngày học. Buổi đã báo nghỉ thì nhận xét không in ra.
+- **Cả tháng** — nút **✍️ Nhận xét tháng** trên thanh công cụ: chọn lớp, chọn *Xếp loại*
+  (Tốt / Khá / Trung bình / Cần cố gắng — bấm lại để bỏ chọn) và viết nhận xét chung.
+  Mỗi lớp mỗi tháng một nhận xét riêng.
+
+Ở cửa sổ xem trước có ô **Kèm nhận xét** để bật/tắt trước khi in — tiện khi chỉ muốn gửi
+riêng phần tiền. Hóa đơn gộp nhiều lớp thì không in nhận xét chung của tháng (vì mỗi lớp
+một nhận xét khác nhau), nhưng nhận xét từng buổi vẫn theo đúng buổi của nó.
+
 ### Thanh toán
 
 Cuối mỗi hóa đơn có khối thanh toán gồm số tài khoản, số tiền phải trả và **mã QR VietQR**

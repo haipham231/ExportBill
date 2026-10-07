@@ -182,6 +182,14 @@ code { background: var(--surface-2); padding: 1px 5px; border-radius: 5px; font-
 .tag.edited { background: #eff6ff; color: var(--primary); border-color: #bfdbfe; }
 .tag.slot { background: #f5f3ff; color: #6d3fd1; border-color: #ddd6fe; }
 
+.s-comment {
+  font-size: 12.5px; color: var(--text); margin-top: 5px;
+  padding: 5px 9px; background: var(--surface-2);
+  border-left: 2px solid #c4b5fd; border-radius: 0 7px 7px 0;
+}
+.icon-btn.has-note { background: #f5f3ff; }
+.wd.wide { width: auto; padding: 7px 14px; }
+
 /* ===== Thẻ lớp học ===== */
 .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
 .card {
@@ -318,6 +326,22 @@ code { background: var(--surface-2); padding: 1px 5px; border-radius: 5px; font-
   background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; padding: 4px;
 }
 .qr-cap { font-size: 10.5px; color: #666; margin-top: 3px; }
+.inv-review {
+  margin-top: 16px; padding: 11px 13px;
+  background: #fbfaff; border: 1px solid #e4e0f5; border-radius: 6px;
+}
+.inv-review .lbl {
+  font-weight: 700; color: #4c2d9e; font-size: 11.5px;
+  letter-spacing: .06em; display: block; margin-bottom: 5px;
+}
+.rv-level { font-size: 13px; margin-bottom: 4px; }
+.rv-text { margin: 0 0 8px; font-size: 13px; line-height: 1.55; }
+.rv-list { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.rv-list td { padding: 3px 0; vertical-align: top; border-top: 1px solid #ebe7f8; }
+.rv-list tr:first-child td { border-top: 0; }
+.rv-day { width: 110px; color: #555; white-space: nowrap; padding-right: 10px !important; }
+.rv-ca { color: #888; }
+
 .inv-sign { display: flex; justify-content: space-between; gap: 40px; margin-top: 34px; text-align: center; }
 .inv-sign > div { flex: 1; }
 .inv-sign .lbl { font-weight: 650; color: #111; }
@@ -399,6 +423,7 @@ code { background: var(--surface-2); padding: 1px 5px; border-radius: 5px; font-
   .inv-table { page-break-inside: auto; }
   .inv-table tr { page-break-inside: avoid; }
   .inv-bank { page-break-inside: avoid; }
+  .inv-review { page-break-inside: avoid; }
   .inv-bank-qr img { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 }
 
