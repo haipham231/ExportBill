@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ExportBill — Tính tiền &amp; xuất hóa đơn buổi dạy</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">₫</span>
+    <div>
+      <h1>ExportBill</h1>
+      <p>Tính tiền buổi dạy &amp; xuất hóa đơn</p>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button class="tab is-active" data-tab="schedule">Lịch &amp; Hóa đơn</button>
+    <button class="tab" data-tab="classes">Lớp học</button>
+    <button class="tab" data-tab="settings">Cài đặt</button>
+  </nav>
+</header>
+
+<main class="wrap">
+
+  <!-- ============ TAB: LỊCH & HÓA ĐƠN ============ -->
+  <section class="panel is-active" id="panel-schedule">
+    <div class="toolbar">
+      <div class="month-nav">
+        <button class="icon-btn" id="prevMonth" title="Tháng trước">‹</button>
+        <span class="month-pick"><button class="month-label" id="monthLabel"></button><input type="month" id="monthInput" aria-label="Chọn tháng"></span>
+        <button class="icon-btn" id="nextMonth" title="Tháng sau">›</button>
+        <button class="link-btn" id="thisMonth">Tháng này</button>
+      </div>
+      <div class="spacer"></div>
+      <label class="field inline">
+        <span>Lớp</span>
+        <select id="classFilter"><option value="">Tất cả lớp</option></select>
+      </label>
+      <button class="btn ghost" id="addExtraBtn">+ Buổi dạy thêm</button>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="toolbar sticky">
+      <label class="check all"><input type="checkbox" id="checkAll"> <span>Chọn tất cả</span></label>
+      <span class="sel-count" id="selCount">Đã chọn 0 buổi</span>
+      <div class="spacer"></div>
+      <button class="btn" id="billSelected">Xuất bill các buổi đã chọn</button>
+      <button class="btn" id="billPerClass">Xuất bill riêng từng lớp</button>
+      <button class="btn primary" id="billMonth">Xuất bill cả tháng</button>
+      <button class="btn ghost" id="exportCsv">CSV</button>
+    </div>
+
+    <div id="sessionList"></div>
+  </section>
+
+  <!-- ============ TAB: LỚP HỌC ============ -->
+  <section class="panel" id="panel-classes">
+    <div class="toolbar">
+      <h2>Lớp học / Lịch cố định</h2>
+      <div class="spacer"></div>
+      <button class="btn primary" id="addClassBtn">+ Thêm lớp</button>
+    </div>
+    <div id="classList" class="card-grid"></div>
+  </section>
+
+  <!-- ============ TAB: CÀI ĐẶT ============ -->
+  <section class="panel" id="panel-settings">
+    <div class="settings-grid">
+      <div class="card">
+        <h2>Thông tin người dạy</h2>
+        <p class="hint">Phần này hiện trên đầu hóa đơn.</p>
+        <label class="field"><span>Họ tên</span><input id="setName" placeholder="NGUYEN THU HA"></label>
+        <label class="field"><span>Điện thoại</span><input id="setPhone" placeholder="09xx xxx xxx"></label>
+        <label class="field"><span>Địa chỉ</span><input id="setAddress" placeholder="Không bắt buộc"></label>
+        <label class="field"><span>Thông tin thanh toán</span>
+          <textarea id="setBank" rows="3" placeholder="VPBank – 2420001013 – NGUYEN THU HA"></textarea></label>
+        <div class="field">
+          <span>Mã QR chuyển khoản</span>
+          <div id="qrPreview" class="qr-preview"></div>
+          <div class="row-btns">
+            <button class="btn" id="qrPick">Đổi ảnh QR</button>
+            <button class="btn ghost" id="qrClear">Bỏ QR khỏi bill</button>
+          </div>
+          <small class="hint">Ảnh QR in kèm ở cuối mỗi hóa đơn để phụ huynh quét chuyển khoản.</small>
+          <input type="file" id="qrFile" accept="image/*" hidden>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Mặc định</h2>
+        <label class="field"><span>Giá mỗi buổi</span>
+          <input id="setPrice" class="money" placeholder="500.000">
+          <small class="hint">Gõ tắt được: <code>500k</code>, <code>1tr2</code></small></label>
+        <label class="field"><span>Tiền tố số hóa đơn</span><input id="setPrefix" placeholder="HD"></label>
+      </div>
+      <div class="card">
+        <h2>Dữ liệu</h2>
+        <p class="hint">Dữ liệu nằm trong trình duyệt của máy này. Nên sao lưu định kỳ.</p>
+        <div class="row-btns">
+          <button class="btn" id="backupBtn">Tải file sao lưu</button>
+          <button class="btn" id="restoreBtn">Khôi phục từ file</button>
+          <button class="btn danger ghost" id="resetBtn">Xoá toàn bộ</button>
+        </div>
+        <input type="file" id="restoreFile" accept="application/json" hidden>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ============ MODAL: LỚP HỌC ============ -->
+<div class="modal" id="classModal" hidden>
+  <div class="modal-box">
+    <header class="modal-head">
+      <h2 id="classModalTitle">Thêm lớp</h2>
+      <button class="icon-btn" data-close>×</button>
+    </header>
+    <div class="modal-body">
+      <label class="field"><span>Tên lớp *</span><input id="clsName" placeholder="VD: Toán 9 — bé Minh"></label>
+      <label class="field"><span>Học viên / Phụ huynh</span><input id="clsStudent" placeholder="Không bắt buộc"></label>
+      <div class="field">
+        <span>Các buổi trong tuần *</span>
+        <div class="weekdays" id="clsWeekdays"></div>
+      </div>
+      <div class="field-row">
+        <label class="field"><span>Giờ bắt đầu</span><input id="clsStart" placeholder="18:00"></label>
+        <label class="field"><span>Giờ kết thúc</span><input id="clsEnd" placeholder="19:30"></label>
+      </div>
+      <label class="field"><span>Giá mỗi buổi</span><input id="clsPrice" class="money" placeholder="500.000"></label>
+      <div class="field-row">
+        <label class="field"><span>Bắt đầu từ ngày</span><input id="clsStartDate" type="date"></label>
+        <label class="field"><span>Kết thúc ngày</span><input id="clsEndDate" type="date"></label>
+      </div>
+      <label class="field"><span>Ghi chú</span><input id="clsNote" placeholder="Không bắt buộc"></label>
+    </div>
+    <footer class="modal-foot">
+      <button class="btn ghost" data-close>Huỷ</button>
+      <button class="btn primary" id="saveClass">Lưu</button>
+    </footer>
+  </div>
+</div>
+
+<!-- ============ MODAL: BUỔI DẠY THÊM ============ -->
+<div class="modal" id="extraModal" hidden>
+  <div class="modal-box narrow">
+    <header class="modal-head">
+      <h2>Thêm buổi dạy thêm / dạy bù</h2>
+      <button class="icon-btn" data-close>×</button>
+    </header>
+    <div class="modal-body">
+      <label class="field"><span>Lớp *</span><select id="exClass"></select></label>
+      <label class="field"><span>Ngày *</span><input id="exDate" type="date"></label>
+      <div class="field-row">
+        <label class="field"><span>Giờ bắt đầu</span><input id="exStart" placeholder="18:00"></label>
+        <label class="field"><span>Giờ kết thúc</span><input id="exEnd" placeholder="19:30"></label>
+      </div>
+      <label class="field"><span>Giá buổi này</span><input id="exPrice" class="money" placeholder="Để trống = giá của lớp"></label>
+      <label class="field"><span>Ghi chú</span><input id="exNote" placeholder="VD: dạy bù buổi nghỉ 05/10"></label>
+    </div>
+    <footer class="modal-foot">
+      <button class="btn ghost" data-close>Huỷ</button>
+      <button class="btn primary" id="saveExtra">Thêm buổi</button>
+    </footer>
+  </div>
+</div>
+
+<!-- ============ MODAL: XEM TRƯỚC HÓA ĐƠN ============ -->
+<div class="modal" id="billModal" hidden>
+  <div class="modal-box wide">
+    <header class="modal-head no-print">
+      <h2>Xem trước hóa đơn</h2>
+      <div class="spacer"></div>
+      <button class="btn" id="billCsv">Tải CSV</button>
+      <button class="btn primary" id="billPrint">In / Lưu PDF</button>
+      <button class="icon-btn" data-close>×</button>
+    </header>
+    <div class="modal-body bill-body" id="billArea"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="js/utils.js"></script>
+<script src="js/store.js"></script>
+<script src="js/invoice.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
