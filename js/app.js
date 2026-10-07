@@ -52,12 +52,18 @@
     });
   }
 
-  function weekdaysLabel(days) {
-    if (!days || !days.length) return 'Chưa đặt lịch';
-    return WEEKDAY_OPTIONS
-      .filter(function (o) { return days.indexOf(o.v) !== -1; })
-      .map(function (o) { return o.v === 0 ? 'Chủ nhật' : 'Thứ ' + (o.v + 1); })
-      .join(', ');
+  function slotLines(cls) {
+    if (!cls.slots || !cls.slots.length) return '<div>📅 Chưa đặt lịch</div>';
+    return Store.sortSlots(cls.slots).map(function (sl, i) {
+      var h = Utils.durationHours(sl.startTime, sl.endTime);
+      return '<div class="slot-line">' +
+        '<span class="ico">' + (i === 0 ? '📅' : '&nbsp;') + '</span>' +
+        '<b>' + E(thuLabel(sl.weekday)) + '</b>' +
+        '<span>' + E(sl.startTime) + ' – ' + E(sl.endTime) + '</span>' +
+        '<span class="h">' + Utils.formatHours(h) + '</span>' +
+        '<span class="g">' + Utils.formatMoney(Store.slotPrice(cls, sl)) + 'đ</span>' +
+      '</div>';
+    }).join('');
   }
 
   /* ===================== Tab ===================== */
@@ -214,7 +220,7 @@
       Object.assign(ex, patch);
       Store.save();
     } else {
-      Store.setOverride(s.classId, s.date, patch);
+      Store.setOverride(s.key, patch);
     }
   }
 
@@ -276,12 +282,12 @@
       var s = find(btn.dataset.toggle);
       if (!s) return;
       if (s.isExtra) { toast('Ca dạy thêm: xoá bằng nút 🗑 nếu không dạy nữa.'); return; }
-      Store.setOverride(s.classId, s.date, { status: s.status === 'off' ? 'teach' : 'off' });
+      Store.setOverride(s.key, { status: s.status === 'off' ? 'teach' : 'off' });
       renderSessions();
     } else if (btn.dataset.reset) {
       var r = find(btn.dataset.reset);
       if (r) {
-        Store.setOverride(r.classId, r.date, { price: '', startTime: '', endTime: '' });
+        Store.setOverride(r.key, { price: '', startTime: '', endTime: '' });
         renderSessions();
         toast('Đã dùng lại giờ và giá của lớp.');
       }
@@ -395,15 +401,15 @@
         '<h3>' + E(c.name) + '</h3>' +
         '<div class="meta">' +
           (c.student ? '<div>👤 ' + E(c.student) + '</div>' : '') +
-          '<div>📅 ' + E(weekdaysLabel(c.weekdays)) + '</div>' +
-          '<div>🕐 ' + E(c.startTime || '—') + ' – ' + E(c.endTime || '—') + '</div>' +
+          slotLines(c) +
           (c.startDate || c.endDate ? '<div>📆 ' +
             (c.startDate ? 'từ ' + Utils.formatDate(c.startDate) : '') +
             (c.endDate ? ' đến ' + Utils.formatDate(c.endDate) : '') + '</div>' : '') +
           (c.note ? '<div>📝 ' + E(c.note) + '</div>' : '') +
           (c.active === false ? '<div><span class="tag off">Tạm ngưng</span></div>' : '') +
         '</div>' +
-        '<div class="price">' + Utils.formatMoney(c.price) + ' đ<span class="s-sub"> / buổi</span></div>' +
+        '<div class="price">' + Utils.formatMoney(c.price) +
+          ' đ<span class="s-sub"> / buổi (mặc định)</span></div>' +
         '<div class="row-btns">' +
           '<button class="btn" data-edit="' + E(c.id) + '">Sửa</button>' +
           '<button class="btn ghost" data-pause="' + E(c.id) + '">' +
@@ -430,20 +436,99 @@
     }
   });
 
-  function renderWeekdayPicker(selected) {
+  function thuLabel(wd) { return wd === 0 ? 'Chủ nhật' : 'Thứ ' + (wd + 1); }
+
+  /* Đọc các khung giờ đang hiện trên hộp thoại (nguồn sự thật là DOM) */
+  function readSlots() {
+    return Array.from(document.querySelectorAll('#clsSlots .slot-row')).map(function (row) {
+      var gia = row.querySelector('.slot-price').value.trim();
+      return {
+        id: row.dataset.id,
+        weekday: Number(row.dataset.wd),
+        startTime: row.querySelector('.slot-start').value.trim(),
+        endTime: row.querySelector('.slot-end').value.trim(),
+        price: gia ? Utils.parseMoney(gia) : null
+      };
+    });
+  }
+
+  function renderSlots(slots) {
+    slots = Store.sortSlots(slots);
+    var giaMacDinh = Utils.parseMoney($('#clsPrice').value) || Store.get().settings.defaultPrice;
+
+    $('#clsSlots').innerHTML = slots.length ? slots.map(function (sl) {
+      var hours = Utils.durationHours(Utils.normalizeTime(sl.startTime), Utils.normalizeTime(sl.endTime));
+      return '<div class="slot-row" data-id="' + E(sl.id) + '" data-wd="' + sl.weekday + '">' +
+        '<span class="slot-day">' + E(thuLabel(sl.weekday)) +
+          (hours ? '<small>' + Utils.formatHours(hours) + '</small>' : '') + '</span>' +
+        '<input class="slot-start" value="' + E(sl.startTime) + '" aria-label="Giờ bắt đầu">' +
+        '<span class="sep">–</span>' +
+        '<input class="slot-end" value="' + E(sl.endTime) + '" aria-label="Giờ kết thúc">' +
+        '<input class="slot-price money" value="' + (sl.price ? Utils.formatMoney(sl.price) : '') +
+          '" placeholder="' + Utils.formatMoney(giaMacDinh) + '" aria-label="Giá buổi này">' +
+        '<button type="button" class="icon-btn" data-dupslot title="Thêm một ca nữa cùng ' +
+          E(thuLabel(sl.weekday)) + '">＋</button>' +
+        '<button type="button" class="icon-btn" data-delslot title="Xoá khung giờ này">×</button>' +
+      '</div>';
+    }).join('') : '<div class="hint slot-empty">Chọn thứ ở trên để thêm buổi học.</div>';
+
+    document.querySelectorAll('#clsWeekdays .wd').forEach(function (el) {
+      var on = slots.some(function (sl) { return sl.weekday === Number(el.dataset.wd); });
+      el.classList.toggle('on', on);
+      el.setAttribute('aria-pressed', String(on));
+    });
+    document.querySelectorAll('#clsSlots .slot-start, #clsSlots .slot-end').forEach(bindTime);
+    document.querySelectorAll('#clsSlots .slot-price').forEach(bindMoney);
+  }
+
+  function renderWeekdayPicker() {
     $('#clsWeekdays').innerHTML = WEEKDAY_OPTIONS.map(function (o) {
-      var on = selected.indexOf(o.v) !== -1;
-      return '<button type="button" class="wd' + (on ? ' on' : '') + '" data-wd="' + o.v +
-        '" aria-pressed="' + on + '">' + o.label + '</button>';
+      return '<button type="button" class="wd" data-wd="' + o.v +
+        '" aria-pressed="false">' + o.label + '</button>';
     }).join('');
   }
 
+  /* Khung giờ mới lấy mẫu từ khung đã có, để chọn nhiều thứ cùng giờ cho nhanh */
+  function slotMoi(wd, dangCo) {
+    var mau = dangCo[0];
+    return Store.newSlot(wd,
+      mau ? Utils.normalizeTime(mau.startTime) : '18:00',
+      mau ? Utils.normalizeTime(mau.endTime) : '19:30',
+      mau ? mau.price : null);
+  }
+
   $('#clsWeekdays').addEventListener('click', function (e) {
-    var wd = e.target.closest('.wd');
-    if (!wd) return;
-    var on = wd.classList.toggle('on');
-    wd.setAttribute('aria-pressed', String(on));
+    var el = e.target.closest('.wd');
+    if (!el) return;
+    var wd = Number(el.dataset.wd);
+    var slots = readSlots();
+    if (slots.some(function (sl) { return sl.weekday === wd; })) {
+      slots = slots.filter(function (sl) { return sl.weekday !== wd; });
+    } else {
+      slots.push(slotMoi(wd, slots));
+    }
+    renderSlots(slots);
   });
+
+  $('#clsSlots').addEventListener('click', function (e) {
+    var btn = e.target.closest('button');
+    if (!btn) return;
+    var row = btn.closest('.slot-row');
+    var slots = readSlots();
+
+    if (btn.hasAttribute('data-delslot')) {
+      renderSlots(slots.filter(function (sl) { return sl.id !== row.dataset.id; }));
+    } else if (btn.hasAttribute('data-dupslot')) {
+      var goc = slots.find(function (sl) { return sl.id === row.dataset.id; });
+      var dai = Utils.durationHours(Utils.normalizeTime(goc.startTime), Utils.normalizeTime(goc.endTime)) * 60 || 90;
+      var batDau = Utils.normalizeTime(goc.endTime) || '19:30';
+      slots.push(Store.newSlot(goc.weekday, batDau, Utils.addMinutes(batDau, dai), goc.price));
+      renderSlots(slots);
+    }
+  });
+
+  /* Đổi giá mặc định thì ô gợi ý trên từng khung giờ phải đổi theo */
+  $('#clsPrice').addEventListener('blur', function () { renderSlots(readSlots()); });
 
   function openClassModal(id) {
     view.editingClassId = id;
@@ -451,13 +536,12 @@
     $('#classModalTitle').textContent = c ? 'Sửa lớp' : 'Thêm lớp';
     $('#clsName').value = c ? c.name : '';
     $('#clsStudent').value = c ? c.student : '';
-    $('#clsStart').value = c ? c.startTime : '18:00';
-    $('#clsEnd').value = c ? c.endTime : '19:30';
     $('#clsPrice').value = Utils.formatMoney(c ? c.price : Store.get().settings.defaultPrice);
     $('#clsStartDate').value = c ? c.startDate : '';
     $('#clsEndDate').value = c ? c.endDate : '';
     $('#clsNote').value = c ? c.note : '';
-    renderWeekdayPicker(c ? c.weekdays : []);
+    renderWeekdayPicker();
+    renderSlots(c ? c.slots.map(function (sl) { return Object.assign({}, sl); }) : []);
     openModal('#classModal');
     $('#clsName').focus();
   }
@@ -467,16 +551,31 @@
   $('#saveClass').addEventListener('click', function () {
     var name = $('#clsName').value.trim();
     if (!name) { toast('Nhập tên lớp đã nhé.'); $('#clsName').focus(); return; }
-    var weekdays = Array.from(document.querySelectorAll('#clsWeekdays .wd.on'))
-      .map(function (el) { return Number(el.dataset.wd); });
-    if (!weekdays.length) { toast('Chọn ít nhất một thứ trong tuần.'); return; }
-    var start = Utils.normalizeTime($('#clsStart').value);
-    var end = Utils.normalizeTime($('#clsEnd').value);
+
+    var slots = readSlots();
+    if (!slots.length) { toast('Chọn ít nhất một thứ trong tuần.'); return; }
+
+    var hong = slots.find(function (sl) {
+      return !Utils.normalizeTime(sl.startTime) || !Utils.normalizeTime(sl.endTime);
+    });
+    if (hong) { toast('Khung giờ ' + thuLabel(hong.weekday) + ' chưa hợp lệ. Ví dụ: 18:00.'); return; }
+
+    slots = slots.map(function (sl) {
+      return {
+        id: sl.id,
+        weekday: sl.weekday,
+        startTime: Utils.normalizeTime(sl.startTime),
+        endTime: Utils.normalizeTime(sl.endTime),
+        price: sl.price
+      };
+    });
+    var nguoc = slots.find(function (sl) { return sl.endTime <= sl.startTime; });
+    if (nguoc) toast('Khung giờ ' + thuLabel(nguoc.weekday) + ': giờ kết thúc không sau giờ bắt đầu.');
+
     var data = {
       name: name,
       student: $('#clsStudent').value.trim(),
-      weekdays: weekdays,
-      startTime: start, endTime: end,
+      slots: Store.sortSlots(slots),
       price: Utils.parseMoney($('#clsPrice').value),
       startDate: $('#clsStartDate').value,
       endDate: $('#clsEndDate').value,
@@ -494,15 +593,21 @@
   /* Gợi ý khung giờ: nối tiếp ca cuối cùng của lớp đó trong ngày, dài bằng ca thường */
   function suggestSlot(classId, date) {
     var cls = Store.classById(classId);
-    if (!cls) return { start: '', end: '' };
-    var dai = Utils.durationHours(cls.startTime, cls.endTime) * 60 || 90;
+    if (!cls || !date) return { start: '', end: '' };
+    var thu = Utils.weekdayOf(date);
+    /* ưu tiên khung giờ của đúng thứ đó, không có thì lấy khung đầu tiên của lớp */
+    var slots = Store.sortSlots(cls.slots || []);
+    var mau = slots.find(function (sl) { return sl.weekday === thu; }) || slots[0];
+    var dai = (mau ? Utils.durationHours(mau.startTime, mau.endTime) * 60 : 0) || 90;
+
     var trongNgay = Store.sessionsInMonth(
       Number(date.slice(0, 4)), Number(date.slice(5, 7)), classId
     ).filter(function (x) { return x.date === date; });
 
-    if (!trongNgay.length) return { start: cls.startTime, end: cls.endTime };
-    var cuoi = trongNgay[trongNgay.length - 1];
-    var start = cuoi.endTime || cls.endTime;
+    if (!trongNgay.length) {
+      return mau ? { start: mau.startTime, end: mau.endTime } : { start: '18:00', end: '19:30' };
+    }
+    var start = trongNgay[trongNgay.length - 1].endTime || (mau ? mau.endTime : '19:30');
     return { start: start, end: Utils.addMinutes(start, dai) };
   }
 
@@ -662,7 +767,7 @@
 
   Store.load();
   document.querySelectorAll('input.money').forEach(bindMoney);
-  ['#clsStart', '#clsEnd', '#exStart', '#exEnd'].forEach(function (s) { bindTime($(s)); });
+  ['#exStart', '#exEnd'].forEach(function (s) { bindTime($(s)); });
   renderSettings();
   renderAll();
 })();

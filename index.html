@@ -125,11 +125,13 @@
         <span>Các buổi trong tuần *</span>
         <div class="weekdays" id="clsWeekdays"></div>
       </div>
-      <div class="field-row">
-        <label class="field"><span>Giờ bắt đầu</span><input id="clsStart" placeholder="18:00"></label>
-        <label class="field"><span>Giờ kết thúc</span><input id="clsEnd" placeholder="19:30"></label>
+      <div class="field">
+        <span>Khung giờ &amp; giá từng buổi</span>
+        <div class="slot-list" id="clsSlots"></div>
+        <small class="hint">Mỗi thứ một khung giờ riêng. Bấm <b>＋</b> để thêm ca thứ hai trong
+          cùng thứ đó. Ô giá để trống thì dùng giá mặc định bên dưới.</small>
       </div>
-      <label class="field"><span>Giá mỗi buổi</span><input id="clsPrice" class="money" placeholder="500.000"></label>
+      <label class="field"><span>Giá mặc định mỗi buổi</span><input id="clsPrice" class="money" placeholder="500.000"></label>
       <div class="field-row">
         <label class="field"><span>Bắt đầu từ ngày</span><input id="clsStartDate" type="date"></label>
         <label class="field"><span>Kết thúc ngày</span><input id="clsEndDate" type="date"></label>

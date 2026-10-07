@@ -25,8 +25,16 @@ rồi mở http://localhost:8787
 
 1. **Cài đặt** — đã điền sẵn `NGUYEN THU HA`, `VPBank – 2420001013` và mã QR VietQR;
    bổ sung số điện thoại nếu muốn. Giá mặc định mỗi buổi: 500.000đ.
-2. **Lớp học → + Thêm lớp** — đặt tên lớp, chọn các thứ trong tuần (VD: Thứ 2, Thứ 3),
-   khung giờ (18:00–19:30) và giá mỗi buổi.
+2. **Lớp học → + Thêm lớp** — đặt tên lớp rồi chọn các thứ trong tuần. Mỗi thứ chọn xong
+   sẽ hiện một dòng riêng để đặt **khung giờ và giá cho đúng thứ đó**:
+
+   | | | |
+   |---|---|---|
+   | Thứ 2 | 18:00 – 19:30 | 500.000đ |
+   | Thứ 3 | 08:00 – 10:00 | 700.000đ |
+
+   Ô giá để trống thì lấy *Giá mặc định mỗi buổi* của lớp. Bấm **＋** ở cuối dòng để thêm
+   ca thứ hai trong cùng một thứ (VD: thứ 7 học cả sáng lẫn chiều).
 3. **Lịch & Hóa đơn** — chọn tháng, phần mềm tự liệt kê mọi buổi dạy và cộng tiền.
 
 ### Xuất hóa đơn
@@ -69,9 +77,11 @@ Mỗi dòng trong tab **Lịch & Hóa đơn** đều sửa trực tiếp đượ
 
 ### Nhiều ca trong một ngày
 
-Bấm **+ thêm giờ** ở tiêu đề ngày để thêm một ca nữa cho đúng ngày đó — giờ bắt đầu được
-gợi ý nối tiếp ca trước, dài bằng ca thường, và ca mới đặt giá riêng được (để trống thì
-lấy giá của lớp).
+Hai cách, tuỳ việc nó lặp lại hay chỉ một lần:
+
+- **Lặp hàng tuần** — vào *Lớp học → Sửa*, bấm **＋** ở dòng của thứ đó để thêm ca thứ hai.
+- **Chỉ một lần** — bấm **+ thêm giờ** ở tiêu đề ngày trong tab *Lịch & Hóa đơn*. Giờ bắt đầu
+  được gợi ý nối tiếp ca trước, dài bằng ca thường, và đặt giá riêng được.
 
 Ngày có từ hai ca trở lên sẽ được đánh số **Ca 1/2**, **Ca 2/2**… cả trên màn hình lẫn
 trên hóa đơn, nên phụ huynh nhìn là biết ngày đó học mấy ca, mỗi ca từ mấy giờ tới mấy

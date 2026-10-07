@@ -23,6 +23,19 @@ var Store = (function () {
     };
   }
 
+  /* Bù các trường còn thiếu rồi nâng cấp dữ liệu cũ. Dùng chung cho mở app và khôi phục file. */
+  function normalize(st) {
+    var base = defaultState();
+    Object.keys(base).forEach(function (k) {
+      if (st[k] === undefined) st[k] = base[k];
+    });
+    Object.keys(base.settings).forEach(function (k) {
+      if (st.settings[k] === undefined) st.settings[k] = base.settings[k];
+    });
+    migrate(st);
+    return st;
+  }
+
   function load() {
     try {
       var raw = localStorage.getItem(KEY);
@@ -30,14 +43,36 @@ var Store = (function () {
     } catch (e) {
       state = defaultState();
     }
-    var base = defaultState();
-    Object.keys(base).forEach(function (k) {
-      if (state[k] === undefined) state[k] = base[k];
+    return normalize(state);
+  }
+
+  /* Bản cũ: lớp có weekdays[] + một khung giờ dùng chung, ghi đè khoá "lopId|ngày".
+     Bản mới: mỗi thứ là một slot có id riêng, ghi đè khoá "lopId|slotId|ngày". */
+  function migrate(state) {
+    var caiCu = false;
+    state.classes.forEach(function (c) {
+      if (Array.isArray(c.slots)) return;
+      caiCu = true;
+      c.slots = (c.weekdays || []).map(function (wd) {
+        return newSlot(wd, c.startTime, c.endTime, null);
+      });
+      delete c.weekdays;
+      delete c.startTime;
+      delete c.endTime;
     });
-    Object.keys(base.settings).forEach(function (k) {
-      if (state.settings[k] === undefined) state.settings[k] = base.settings[k];
+    if (!caiCu) return;
+
+    var moi = {};
+    Object.keys(state.overrides).forEach(function (k) {
+      var phan = k.split('|');
+      if (phan.length === 3) { moi[k] = state.overrides[k]; return; }
+      var cls = state.classes.find(function (c) { return c.id === phan[0]; });
+      if (!cls) return;
+      var thu = Utils.fromISO(phan[1]).getDay();
+      var slot = cls.slots.find(function (sl) { return sl.weekday === thu; });
+      if (slot) moi[cls.id + '|' + slot.id + '|' + phan[1]] = state.overrides[k];
     });
-    return state;
+    state.overrides = moi;
   }
 
   function save() {
@@ -54,14 +89,29 @@ var Store = (function () {
 
   /* ---------- Lớp học ---------- */
 
+  function newSlot(weekday, startTime, endTime, price) {
+    return {
+      id: Utils.uid('s'),
+      weekday: weekday,
+      startTime: startTime || '18:00',
+      endTime: endTime || '19:30',
+      price: (price === undefined || price === null || price === '') ? null : Number(price)
+    };
+  }
+
   function addClass(data) {
+    var slots = data.slots;
+    /* Dạng cũ: một danh sách thứ dùng chung một khung giờ */
+    if (!slots) {
+      slots = (data.weekdays || []).map(function (wd) {
+        return newSlot(wd, data.startTime, data.endTime, null);
+      });
+    }
     var c = {
       id: Utils.uid('c'),
       name: data.name || 'Lớp mới',
       student: data.student || '',
-      weekdays: data.weekdays || [],
-      startTime: data.startTime || '18:00',
-      endTime: data.endTime || '19:30',
+      slots: slots,
       price: data.price !== undefined ? data.price : get().settings.defaultPrice,
       startDate: data.startDate || '',
       endDate: data.endDate || '',
@@ -72,6 +122,20 @@ var Store = (function () {
     get().classes.push(c);
     save();
     return c;
+  }
+
+  /* Khung giờ của lớp, sắp theo thứ 2 → chủ nhật rồi tới giờ bắt đầu */
+  var THU_TU = [1, 2, 3, 4, 5, 6, 0];
+  function sortSlots(slots) {
+    return slots.slice().sort(function (a, b) {
+      var d = THU_TU.indexOf(a.weekday) - THU_TU.indexOf(b.weekday);
+      return d !== 0 ? d : (a.startTime < b.startTime ? -1 : a.startTime > b.startTime ? 1 : 0);
+    });
+  }
+
+  function slotPrice(cls, slot) {
+    return (slot && slot.price !== null && slot.price !== undefined && slot.price !== '')
+      ? Number(slot.price) : Number(cls.price) || 0;
   }
 
   function pickColor() {
@@ -102,22 +166,22 @@ var Store = (function () {
 
   /* ---------- Ghi đè từng buổi ---------- */
 
-  function overrideKey(classId, date) { return classId + '|' + date; }
+  function overrideKey(classId, slotId, date) { return classId + '|' + slotId + '|' + date; }
 
-  function setOverride(classId, date, patch) {
+  /* key chính là session.key của buổi đó */
+  function setOverride(key, patch) {
     var s = get();
-    var k = overrideKey(classId, date);
-    s.overrides[k] = Object.assign({}, s.overrides[k], patch);
-    var o = s.overrides[k];
-    var empty = Object.keys(o).every(function (key) {
-      return o[key] === undefined || o[key] === null || o[key] === '';
+    s.overrides[key] = Object.assign({}, s.overrides[key], patch);
+    var o = s.overrides[key];
+    var empty = Object.keys(o).every(function (k) {
+      return o[k] === undefined || o[k] === null || o[k] === '';
     });
-    if (empty) delete s.overrides[k];
+    if (empty) delete s.overrides[key];
     save();
   }
 
-  function clearOverride(classId, date) {
-    delete get().overrides[overrideKey(classId, date)];
+  function clearOverride(key) {
+    delete get().overrides[key];
     save();
   }
 
@@ -146,10 +210,13 @@ var Store = (function () {
 
   /* ---------- Sinh buổi dạy theo lịch ---------- */
 
-  function buildSession(cls, date, extra) {
+  function buildSession(cls, slot, date, extra) {
     var s = get();
-    var ov = extra ? null : s.overrides[overrideKey(cls.id, date)];
-    var price = cls.price;
+    var key = extra ? 'x|' + extra.id : overrideKey(cls.id, slot.id, date);
+    var ov = extra ? null : s.overrides[key];
+    var giaLich = slot ? slotPrice(cls, slot) : Number(cls.price) || 0;
+
+    var price = giaLich;
     var priceEdited = false;
     if (extra && extra.price !== undefined && extra.price !== null && extra.price !== '') {
       price = extra.price; priceEdited = true;
@@ -157,15 +224,16 @@ var Store = (function () {
       price = ov.price; priceEdited = true;
     }
     return {
-      key: extra ? 'x|' + extra.id : overrideKey(cls.id, date),
+      key: key,
       classId: cls.id,
       className: cls.name,
       student: cls.student,
       color: cls.color,
+      slotId: slot ? slot.id : null,
       date: date,
-      startTime: (extra && extra.startTime) || (ov && ov.startTime) || cls.startTime,
-      endTime: (extra && extra.endTime) || (ov && ov.endTime) || cls.endTime,
-      /* buổi dạy thêm vốn đã có giờ riêng, chỉ đánh dấu khi lệch lịch cố định */
+      startTime: (extra && extra.startTime) || (ov && ov.startTime) || (slot && slot.startTime) || '',
+      endTime: (extra && extra.endTime) || (ov && ov.endTime) || (slot && slot.endTime) || '',
+      /* buổi dạy thêm vốn đã có giờ riêng, chỉ đánh dấu khi lệch khung giờ cố định */
       timeEdited: !extra && !!(ov && (ov.startTime || ov.endTime)),
       price: Number(price) || 0,
       priceEdited: priceEdited,
@@ -185,16 +253,18 @@ var Store = (function () {
       return c.active !== false && (!classId || c.id === classId);
     });
 
+    var days = Utils.daysInMonth(year, month);
     classes.forEach(function (cls) {
-      var days = Utils.daysInMonth(year, month);
-      for (var d = 1; d <= days; d++) {
-        var dt = new Date(year, month - 1, d);
-        if (cls.weekdays.indexOf(dt.getDay()) === -1) continue;
-        var iso = Utils.toISO(dt);
-        if (cls.startDate && iso < cls.startDate) continue;
-        if (cls.endDate && iso > cls.endDate) continue;
-        out.push(buildSession(cls, iso, null));
-      }
+      (cls.slots || []).forEach(function (slot) {
+        for (var d = 1; d <= days; d++) {
+          var dt = new Date(year, month - 1, d);
+          if (dt.getDay() !== slot.weekday) continue;
+          var iso = Utils.toISO(dt);
+          if (cls.startDate && iso < cls.startDate) continue;
+          if (cls.endDate && iso > cls.endDate) continue;
+          out.push(buildSession(cls, slot, iso, null));
+        }
+      });
     });
 
     var prefix = year + '-' + Utils.pad(month);
@@ -203,7 +273,7 @@ var Store = (function () {
       if (classId && e.classId !== classId) return;
       var cls = classById(e.classId);
       if (!cls) return;
-      out.push(buildSession(cls, e.date, e));
+      out.push(buildSession(cls, null, e.date, e));
     });
 
     out.sort(function (a, b) {
@@ -233,8 +303,8 @@ var Store = (function () {
   function importJSON(text) {
     var data = JSON.parse(text);
     if (!data || !Array.isArray(data.classes)) throw new Error('Tệp sao lưu không hợp lệ.');
-    state = data;
-    load();
+    /* Không gọi load() ở đây: load() đọc lại localStorage và sẽ xoá mất dữ liệu vừa nhập */
+    state = normalize(data);
     save();
   }
 
@@ -249,6 +319,7 @@ var Store = (function () {
     setOverride: setOverride, clearOverride: clearOverride, overrideKey: overrideKey,
     addExtra: addExtra, removeExtra: removeExtra,
     sessionsInMonth: sessionsInMonth,
-    exportJSON: exportJSON, importJSON: importJSON, resetAll: resetAll
+    exportJSON: exportJSON, importJSON: importJSON, resetAll: resetAll,
+    newSlot: newSlot, sortSlots: sortSlots, slotPrice: slotPrice, WEEKDAY_ORDER: THU_TU
   };
 })();
