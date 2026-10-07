@@ -54,7 +54,7 @@ rồi mở http://localhost:8787
 
 Hai mức, đều in kèm ở cuối hóa đơn:
 
-- **Từng buổi** — bấm 💬 trên dòng buổi đó. Nhận xét hiện ngay dưới tên lớp trong lịch,
+- **Từng buổi** — bấm nút **💬 Nhận xét** ở cuối dòng buổi đó. Nhận xét hiện ngay dưới tên lớp trong lịch,
   và lên hóa đơn thành một dòng kèm ngày học. Buổi đã báo nghỉ thì nhận xét không in ra.
 - **Cả tháng** — nút **✍️ Nhận xét tháng** trên thanh công cụ: chọn lớp, chọn *Xếp loại*
   (Tốt / Khá / Trung bình / Cần cố gắng — bấm lại để bỏ chọn) và viết nhận xét chung.

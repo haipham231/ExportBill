@@ -145,14 +145,14 @@
           '" aria-label="Giá buổi này"' + (off ? ' disabled' : '') + '><span class="unit">đ</span>' +
       '</div>' +
       '<div class="s-actions">' +
-        (daSua ? '<button class="icon-btn" data-reset="' + E(s.key) +
-          '" title="Bỏ chỉnh riêng, dùng lại giờ và giá của lớp">⟲</button>' : '') +
-        '<button class="icon-btn" data-toggle="' + E(s.key) + '" title="' +
-          (off ? 'Đánh dấu đã dạy' : 'Đánh dấu nghỉ buổi này') + '">' + (off ? '↺' : '⊘') + '</button>' +
-        '<button class="icon-btn' + (s.comment ? ' has-note' : '') + '" data-note="' + E(s.key) +
-          '" title="' + (s.comment ? 'Sửa nhận xét buổi này' : 'Viết nhận xét cho bé buổi này') + '">💬</button>' +
-        '<button class="icon-btn" data-bill="' + E(s.key) + '" title="Xuất bill riêng buổi này">🧾</button>' +
-        (s.isExtra ? '<button class="icon-btn" data-delextra="' + E(s.extraId) +
+        (daSua ? '<button class="btn tiny" data-reset="' + E(s.key) +
+          '" title="Bỏ chỉnh riêng, dùng lại giờ và giá của lớp">⟲ Đặt lại</button>' : '') +
+        '<button class="btn tiny' + (s.comment ? ' has-note' : '') + '" data-note="' + E(s.key) + '">' +
+          (s.comment ? '💬 Sửa nhận xét' : '💬 Nhận xét') + '</button>' +
+        '<button class="btn tiny" data-toggle="' + E(s.key) + '">' +
+          (off ? '↺ Dạy lại' : '⊘ Nghỉ') + '</button>' +
+        '<button class="btn tiny" data-bill="' + E(s.key) + '" title="Xuất bill riêng buổi này">🧾 Bill</button>' +
+        (s.isExtra ? '<button class="btn tiny danger" data-delextra="' + E(s.extraId) +
           '" title="Xoá ca dạy thêm này">🗑</button>' : '') +
       '</div>' +
     '</div>';
