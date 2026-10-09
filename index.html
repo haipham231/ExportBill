@@ -52,6 +52,7 @@
       <button class="btn" id="billSelected">Xuất bill các buổi đã chọn</button>
       <button class="btn" id="billPerClass">Xuất bill riêng từng lớp</button>
       <button class="btn primary" id="billMonth">Xuất bill cả tháng</button>
+      <button class="btn" id="billMonthsBtn">Nhiều tháng…</button>
       <button class="btn ghost" id="exportCsv">CSV</button>
     </div>
 
@@ -166,6 +167,45 @@
     <footer class="modal-foot">
       <button class="btn ghost" data-close>Huỷ</button>
       <button class="btn primary" id="saveExtra">Thêm ca</button>
+    </footer>
+  </div>
+</div>
+
+<!-- ============ MODAL: CHỌN NHIỀU THÁNG ============ -->
+<div class="modal" id="monthsModal" hidden>
+  <div class="modal-box">
+    <header class="modal-head">
+      <h2>Xuất bill nhiều tháng</h2>
+      <button class="icon-btn" data-close>×</button>
+    </header>
+    <div class="modal-body">
+      <label class="field"><span>Lớp</span><select id="mpClass"></select></label>
+      <div class="field">
+        <span>Chọn tháng</span>
+        <div class="year-nav">
+          <button type="button" class="icon-btn" id="mpPrevYear" title="Năm trước">‹</button>
+          <b id="mpYear"></b>
+          <button type="button" class="icon-btn" id="mpNextYear" title="Năm sau">›</button>
+        </div>
+        <div class="month-grid" id="mpGrid"></div>
+        <small class="hint">Chọn bao nhiêu tháng cũng được, không cần liền nhau.
+          Chấm xanh là tháng có buổi học. Đổi năm vẫn giữ nguyên các tháng đã chọn.</small>
+      </div>
+      <div class="field">
+        <span>Đã chọn</span>
+        <div id="mpPicked" class="picked-list"></div>
+      </div>
+      <div class="field">
+        <span>Kiểu xuất</span>
+        <div class="weekdays" id="mpMode">
+          <button type="button" class="wd wide on" data-mode="gop" aria-pressed="true">Gộp 1 hóa đơn</button>
+          <button type="button" class="wd wide" data-mode="tung" aria-pressed="false">Mỗi tháng 1 tờ</button>
+        </div>
+      </div>
+    </div>
+    <footer class="modal-foot">
+      <button class="btn ghost" data-close>Huỷ</button>
+      <button class="btn primary" id="mpExport">Xuất bill</button>
     </footer>
   </div>
 </div>

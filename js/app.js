@@ -10,7 +10,9 @@
     selected: new Set(),
     editingClassId: null,
     billCtx: null,
-    noteKey: null
+    noteKey: null,
+    pickYear: new Date().getFullYear(),
+    pickedMonths: []
   };
 
   /* Thứ 2..Chủ nhật, map sang Date.getDay() */
@@ -414,9 +416,18 @@
 
   function monthPeriod() { return 'Tháng ' + view.month + '/' + view.year; }
 
-  /* Giữ lại ngữ cảnh để bật/tắt "Kèm nhận xét" là vẽ lại được ngay */
-  function showBill(kind, sessions, opts) {
-    view.billCtx = { kind: kind, sessions: sessions, opts: opts || {} };
+  /* Giữ lại ngữ cảnh để bật/tắt "Kèm nhận xét" là vẽ lại được ngay.
+     Với bill nhiều tháng, data là mảng nhóm theo tháng thay vì mảng buổi. */
+  function showBill(kind, data, opts) {
+    var theoThang = kind === 'multi' || kind === 'perMonth';
+    var sessions = theoThang
+      ? data.reduce(function (acc, g) { return acc.concat(g.sessions); }, [])
+      : data;
+    view.billCtx = {
+      kind: kind, sessions: sessions,
+      groups: theoThang ? data : null,
+      opts: opts || {}
+    };
     renderBillArea();
     openModal('#billModal');
   }
@@ -425,9 +436,12 @@
     var ctx = view.billCtx;
     if (!ctx) return;
     var opts = Object.assign({}, ctx.opts, { withReview: $('#billWithReview').checked });
-    $('#billArea').innerHTML = ctx.kind === 'perClass'
-      ? Invoice.perClass(ctx.sessions, opts)
-      : Invoice.single(ctx.sessions, opts);
+    var html;
+    if (ctx.kind === 'multi') html = Invoice.multiMonth(ctx.groups, opts);
+    else if (ctx.kind === 'perMonth') html = Invoice.perMonth(ctx.groups, opts);
+    else if (ctx.kind === 'perClass') html = Invoice.perClass(ctx.sessions, opts);
+    else html = Invoice.single(ctx.sessions, opts);
+    $('#billArea').innerHTML = html;
   }
 
   $('#billWithReview').addEventListener('change', renderBillArea);
@@ -448,6 +462,110 @@
     var sessions = view.selected.size ? selectedSessions() : currentSessions();
     if (!sessions.length) { toast('Chưa có buổi nào để xuất.'); return; }
     showBill('perClass', sessions, { period: view.selected.size ? null : monthPeriod() });
+  });
+
+  /* ===================== Xuất bill nhiều tháng ===================== */
+
+  function ymLabel(ym) {
+    return 'Tháng ' + Number(ym.slice(5)) + '/' + ym.slice(0, 4);
+  }
+
+  function renderMonthGrid() {
+    $('#mpYear').textContent = view.pickYear;
+    var classId = $('#mpClass').value;
+    var html = '';
+    for (var m = 1; m <= 12; m++) {
+      var ym = view.pickYear + '-' + Utils.pad(m);
+      var coBuoi = Store.sessionsInMonth(view.pickYear, m, classId).length > 0;
+      var chon = view.pickedMonths.indexOf(ym) !== -1;
+      html += '<button type="button" class="mp-month' + (chon ? ' on' : '') + '" data-ym="' + ym +
+        '" aria-pressed="' + chon + '">Tháng ' + m +
+        (coBuoi ? '<span class="dot" title="Tháng này có buổi học"></span>' : '') + '</button>';
+    }
+    $('#mpGrid').innerHTML = html;
+    renderPickedList();
+  }
+
+  function renderPickedList() {
+    var ds = view.pickedMonths.slice().sort();
+    if (!ds.length) {
+      $('#mpPicked').innerHTML = '<span class="hint">Chưa chọn tháng nào.</span>';
+      $('#mpExport').disabled = true;
+      return;
+    }
+    var classId = $('#mpClass').value;
+    $('#mpPicked').innerHTML = ds.map(function (ym) {
+      var n = Store.sessionsInMonth(Number(ym.slice(0, 4)), Number(ym.slice(5)), classId).length;
+      return '<span class="picked' + (n ? '' : ' no-data') + '">' + E(ymLabel(ym)) +
+        '<small>' + (n ? n + ' buổi' : 'không có buổi') + '</small>' +
+        '<button type="button" class="x" data-unpick="' + ym + '" title="Bỏ tháng này">×</button></span>';
+    }).join('');
+    $('#mpExport').disabled = false;
+  }
+
+  $('#mpGrid').addEventListener('click', function (e) {
+    var el = e.target.closest('.mp-month');
+    if (!el) return;
+    var ym = el.dataset.ym;
+    var i = view.pickedMonths.indexOf(ym);
+    if (i === -1) view.pickedMonths.push(ym); else view.pickedMonths.splice(i, 1);
+    renderMonthGrid();
+  });
+
+  $('#mpPicked').addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-unpick]');
+    if (!btn) return;
+    var i = view.pickedMonths.indexOf(btn.dataset.unpick);
+    if (i !== -1) view.pickedMonths.splice(i, 1);
+    renderMonthGrid();
+  });
+
+  $('#mpPrevYear').addEventListener('click', function () { view.pickYear--; renderMonthGrid(); });
+  $('#mpNextYear').addEventListener('click', function () { view.pickYear++; renderMonthGrid(); });
+  $('#mpClass').addEventListener('change', renderMonthGrid);
+
+  $('#mpMode').addEventListener('click', function (e) {
+    var el = e.target.closest('.wd');
+    if (!el) return;
+    document.querySelectorAll('#mpMode .wd').forEach(function (b) {
+      var on = b === el;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+  });
+
+  $('#billMonthsBtn').addEventListener('click', function () {
+    var classes = Store.get().classes;
+    $('#mpClass').innerHTML = '<option value="">Tất cả lớp</option>' + classes.map(function (c) {
+      return '<option value="' + E(c.id) + '">' + E(c.name) + '</option>';
+    }).join('');
+    $('#mpClass').value = view.classId || '';
+    view.pickYear = view.year;
+    if (!view.pickedMonths.length) {
+      view.pickedMonths = [view.year + '-' + Utils.pad(view.month)];
+    }
+    renderMonthGrid();
+    openModal('#monthsModal');
+  });
+
+  $('#mpExport').addEventListener('click', function () {
+    var classId = $('#mpClass').value;
+    var months = view.pickedMonths.slice().sort();
+    if (!months.length) { toast('Chọn ít nhất một tháng.'); return; }
+
+    var groups = months.map(function (ym) {
+      return {
+        ym: ym,
+        label: ymLabel(ym),
+        sessions: Store.sessionsInMonth(Number(ym.slice(0, 4)), Number(ym.slice(5)), classId)
+      };
+    });
+    var gop = $('#mpMode .wd.on').dataset.mode === 'gop';
+    closeModal('#monthsModal');
+    showBill(gop ? 'multi' : 'perMonth', groups, {
+      period: Invoice.monthsLabel(months),
+      payerName: classId ? (Store.classById(classId) || {}).name : ''
+    });
   });
 
   $('#exportCsv').addEventListener('click', function () {

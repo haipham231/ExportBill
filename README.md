@@ -45,6 +45,7 @@ rồi mở http://localhost:8787
 | **Xuất bill các buổi đã chọn** | Gộp các buổi đã tick thành một hóa đơn |
 | **Xuất bill riêng từng lớp** | Mỗi lớp một tờ hóa đơn (in ra là mỗi tờ một trang) |
 | **Xuất bill cả tháng** | Một hóa đơn gồm toàn bộ buổi trong tháng |
+| **Nhiều tháng…** | Chọn nhiều tháng bất kỳ rồi xuất chung (xem bên dưới) |
 | **CSV** | Bảng dữ liệu mở bằng Excel / Google Sheets |
 
 Ở cửa sổ xem trước, bấm **In / Lưu PDF** → trong hộp thoại in chọn
@@ -63,6 +64,26 @@ Hai mức, đều in kèm ở cuối hóa đơn:
 Ở cửa sổ xem trước có ô **Kèm nhận xét** để bật/tắt trước khi in — tiện khi chỉ muốn gửi
 riêng phần tiền. Hóa đơn gộp nhiều lớp thì không in nhận xét chung của tháng (vì mỗi lớp
 một nhận xét khác nhau), nhưng nhận xét từng buổi vẫn theo đúng buổi của nó.
+
+### Xuất nhiều tháng một lần
+
+Bấm **Nhiều tháng…** để mở bảng chọn:
+
+- Chọn **bao nhiêu tháng cũng được và không cần liền nhau** — ví dụ tháng 7 và tháng 9.
+- **Chấm xanh** trên ô tháng = tháng đó có buổi học. Đổi năm bằng `‹ ›`, các tháng đã chọn
+  ở năm khác vẫn được giữ.
+- **Tháng không có buổi học vẫn chọn và xuất được.** Trên hóa đơn, tháng đó hiện thành một
+  mục riêng ghi *"Tháng này không có buổi học nào."*, còn tháng có buổi thì vẫn là bảng
+  chi tiết như thường.
+
+Hai kiểu xuất:
+
+| Kiểu | Kết quả |
+|---|---|
+| **Gộp 1 hóa đơn** | Một tờ, mỗi tháng một mục có dòng *Cộng tháng* riêng, cuối cùng là *Tổng cộng* của tất cả các tháng |
+| **Mỗi tháng 1 tờ** | Mỗi tháng một hóa đơn riêng, in ra là mỗi tháng một trang |
+
+Nhận xét của giáo viên cũng tách theo từng tháng trên hóa đơn gộp.
 
 ### Thanh toán
 

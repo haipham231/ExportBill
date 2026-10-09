@@ -30,7 +30,10 @@ var Invoice = (function () {
     if (!sessions.length) return prefix;
     var dates = sessions.map(function (s) { return s.date; }).sort();
     var sameDay = dates[0] === dates[dates.length - 1];
-    var stamp = dates[0].replace(/-/g, '').slice(0, sameDay ? 8 : 6);
+    var dauThang = dates[0].slice(0, 7), cuoiThang = dates[dates.length - 1].slice(0, 7);
+    var stamp = sameDay ? dates[0].replace(/-/g, '')
+      : dauThang === cuoiThang ? dauThang.replace('-', '')
+      : dauThang.replace('-', '') + '-' + cuoiThang.replace('-', '');
     var ids = [];
     sessions.forEach(function (s) { if (ids.indexOf(s.classId) === -1) ids.push(s.classId); });
     var suffix = '';
@@ -81,101 +84,139 @@ var Invoice = (function () {
     return Store.getReview(ids[0], thangs[0]);
   }
 
-  function reviewHtml(sessions) {
+  function reviewBody(sessions) {
     var chung = monthReview(sessions);
     var tungBuoi = billable(sessions).filter(function (s) { return s.comment; });
     if (!chung && !tungBuoi.length) return '';
 
-    return '<div class="inv-review">' +
-      '<div class="lbl">NHẬN XÉT CỦA GIÁO VIÊN</div>' +
-      (chung && chung.level ? '<div class="rv-level">Xếp loại: <b>' + E(chung.level) + '</b></div>' : '') +
+    return (chung && chung.level ? '<div class="rv-level">Xếp loại: <b>' + E(chung.level) + '</b></div>' : '') +
       (chung && chung.text ? '<p class="rv-text">' + E(chung.text).replace(/\n/g, '<br>') + '</p>' : '') +
       (tungBuoi.length ? '<table class="rv-list">' + tungBuoi.map(function (s) {
         return '<tr><td class="rv-day">' + Utils.formatDate(s.date) +
           (s.slot ? ' <span class="rv-ca">ca ' + s.slot + '</span>' : '') + '</td>' +
           '<td>' + E(s.comment) + '</td></tr>';
-      }).join('') + '</table>' : '') +
-    '</div>';
+      }).join('') + '</table>' : '');
+  }
+
+  function reviewHtml(sessions) {
+    var body = reviewBody(sessions);
+    return body ? '<div class="inv-review"><div class="lbl">NHẬN XÉT CỦA GIÁO VIÊN</div>' +
+      body + '</div>' : '';
+  }
+
+  /* Bill nhiều tháng: mỗi tháng một khối nhận xét riêng, có tiêu đề tháng */
+  function reviewMultiHtml(groups) {
+    var phan = groups.map(function (g) {
+      var body = reviewBody(g.sessions);
+      return body ? '<div class="rv-month"><div class="rv-month-head">' + E(g.label) + '</div>' +
+        body + '</div>' : '';
+    }).filter(Boolean);
+    return phan.length ? '<div class="inv-review"><div class="lbl">NHẬN XÉT CỦA GIÁO VIÊN</div>' +
+      phan.join('') + '</div>' : '';
   }
 
   /* Dựng một tờ hóa đơn. meta: { title, invoiceNo, period, payerName, payerNote, withReview } */
-  function sheetHtml(sessions, meta) {
-    var st = Store.get().settings;
-    var list = billable(sessions);
-    var skipped = sessions.filter(function (s) { return s.status === 'off'; });
-    var total = totalOf(sessions);
-    var classNames = {};
-    list.forEach(function (s) { classNames[s.className] = true; });
-    var showClass = Object.keys(classNames).length > 1;
+  /* ---------- Các mảnh dùng chung của một tờ hóa đơn ---------- */
 
+  function headHtml(meta) {
+    var st = Store.get().settings;
     var issuer = [];
     if (st.teacherName) issuer.push('<div class="big">' + E(st.teacherName) + '</div>');
     if (st.phone) issuer.push('<div>ĐT: ' + E(st.phone) + '</div>');
     if (st.address) issuer.push('<div>' + E(st.address) + '</div>');
     if (!issuer.length) issuer.push('<div class="muted">(Điền thông tin của bạn ở tab Cài đặt)</div>');
 
-    return '' +
-      '<section class="invoice-sheet">' +
-        '<header class="inv-head">' +
-          '<div class="inv-issuer">' + issuer.join('') + '</div>' +
-          '<div class="inv-title">' +
-            '<h1>' + E(meta.title || 'PHIẾU THU HỌC PHÍ') + '</h1>' +
-            '<div class="inv-meta">Số: <b>' + E(meta.invoiceNo) + '</b></div>' +
-            '<div class="inv-meta">Ngày lập: ' + Utils.formatDate(Utils.todayISO()) + '</div>' +
-          '</div>' +
-        '</header>' +
-
-        '<div class="inv-party">' +
-          '<div><span class="lbl">Học viên / Lớp:</span> <b>' + E(meta.payerName || '—') + '</b>' +
-            (meta.payerNote ? '<div class="sub">' + E(meta.payerNote) + '</div>' : '') + '</div>' +
-          '<div><span class="lbl">Kỳ thanh toán:</span> <b>' + E(meta.period) + '</b></div>' +
+    return '<header class="inv-head">' +
+        '<div class="inv-issuer">' + issuer.join('') + '</div>' +
+        '<div class="inv-title">' +
+          '<h1>' + E(meta.title || 'PHIẾU THU HỌC PHÍ') + '</h1>' +
+          '<div class="inv-meta">Số: <b>' + E(meta.invoiceNo) + '</b></div>' +
+          '<div class="inv-meta">Ngày lập: ' + Utils.formatDate(Utils.todayISO()) + '</div>' +
         '</div>' +
+      '</header>' +
+      '<div class="inv-party">' +
+        '<div><span class="lbl">Học viên / Lớp:</span> <b>' + E(meta.payerName || '—') + '</b>' +
+          (meta.payerNote ? '<div class="sub">' + E(meta.payerNote) + '</div>' : '') + '</div>' +
+        '<div><span class="lbl">Kỳ thanh toán:</span> <b>' + E(meta.period) + '</b></div>' +
+      '</div>';
+  }
 
-        '<table class="inv-table">' +
-          '<thead><tr>' +
-            '<th class="c" style="width:38px">STT</th>' +
-            '<th>Ngày dạy</th>' +
-            (showClass ? '<th>Lớp</th>' : '') +
-            '<th style="width:170px">Thời gian</th>' +
-            '<th class="r" style="width:110px">Đơn giá</th>' +
-            '<th class="r" style="width:120px">Thành tiền</th>' +
-          '</tr></thead>' +
-          '<tbody>' + (list.length ? rowsHtml(list, showClass) :
-            '<tr><td colspan="' + (showClass ? 6 : 5) + '" class="c muted">Không có buổi nào</td></tr>') + '</tbody>' +
-          '<tfoot><tr>' +
-            '<td colspan="' + (showClass ? 4 : 3) + '" class="r">Tổng số buổi: <b>' + list.length +
-              '</b> · Tổng số giờ: <b>' + Utils.formatHours(totalHours(sessions)) + '</b></td>' +
-            '<td class="r">TỔNG CỘNG</td>' +
-            '<td class="r total">' + Utils.formatMoney(total) + ' đ</td>' +
-          '</tr></tfoot>' +
-        '</table>' +
+  function tableHtml(sessions, opts) {
+    opts = opts || {};
+    var list = billable(sessions);
+    var classNames = {};
+    list.forEach(function (s) { classNames[s.className] = true; });
+    var showClass = Object.keys(classNames).length > 1;
+    var cols = showClass ? 6 : 5;
 
-        '<div class="inv-words">Bằng chữ: <i>' + E(Utils.docSoTien(total)) + '</i></div>' +
+    return '<table class="inv-table">' +
+      '<thead><tr>' +
+        '<th class="c" style="width:38px">STT</th>' +
+        '<th>Ngày dạy</th>' +
+        (showClass ? '<th>Lớp</th>' : '') +
+        '<th style="width:170px">Thời gian</th>' +
+        '<th class="r" style="width:110px">Đơn giá</th>' +
+        '<th class="r" style="width:120px">Thành tiền</th>' +
+      '</tr></thead>' +
+      '<tbody>' + (list.length ? rowsHtml(list, showClass) :
+        '<tr><td colspan="' + cols + '" class="c muted">' +
+          E(opts.emptyText || 'Không có buổi nào') + '</td></tr>') + '</tbody>' +
+      '<tfoot><tr>' +
+        '<td colspan="' + (showClass ? 4 : 3) + '" class="r">Tổng số buổi: <b>' + list.length +
+          '</b> · Tổng số giờ: <b>' + Utils.formatHours(totalHours(sessions)) + '</b></td>' +
+        '<td class="r">' + E(opts.totalLabel || 'TỔNG CỘNG') + '</td>' +
+        '<td class="r total">' + Utils.formatMoney(totalOf(sessions)) + ' đ</td>' +
+      '</tr></tfoot>' +
+    '</table>';
+  }
 
-        (skipped.length ? '<div class="inv-note">Các buổi nghỉ không tính phí: ' +
-          E(skipped.map(function (s) { return Utils.formatDate(s.date); }).join(', ')) + '</div>' : '') +
+  function wordsHtml(total) {
+    return '<div class="inv-words">Bằng chữ: <i>' + E(Utils.docSoTien(total)) + '</i></div>';
+  }
 
-        (meta.withReview === false ? '' : reviewHtml(sessions)) +
+  function skippedHtml(sessions) {
+    var skipped = sessions.filter(function (s) { return s.status === 'off'; });
+    if (!skipped.length) return '';
+    return '<div class="inv-note">Các buổi nghỉ không tính phí: ' +
+      E(skipped.map(function (s) { return Utils.formatDate(s.date); }).join(', ')) + '</div>';
+  }
 
-        (st.bankInfo || st.qrImage ?
-          '<div class="inv-bank">' +
-            (st.bankInfo ? '<div class="inv-bank-text">' +
-              '<div class="lbl">Thông tin thanh toán</div>' +
-              '<div>' + E(st.bankInfo).replace(/\n/g, '<br>') + '</div>' +
-              '<div class="inv-bank-amount">Số tiền: <b>' + Utils.formatMoney(total) + ' đ</b></div>' +
-            '</div>' : '') +
-            (st.qrImage ? '<div class="inv-bank-qr">' +
-              '<img src="' + E(st.qrImage) + '" alt="Mã QR chuyển khoản">' +
-              '<div class="qr-cap">Quét để chuyển khoản</div>' +
-            '</div>' : '') +
-          '</div>' : '') +
+  function bankHtml(total) {
+    var st = Store.get().settings;
+    if (!st.bankInfo && !st.qrImage) return '';
+    return '<div class="inv-bank">' +
+      (st.bankInfo ? '<div class="inv-bank-text">' +
+        '<div class="lbl">Thông tin thanh toán</div>' +
+        '<div>' + E(st.bankInfo).replace(/\n/g, '<br>') + '</div>' +
+        '<div class="inv-bank-amount">Số tiền: <b>' + Utils.formatMoney(total) + ' đ</b></div>' +
+      '</div>' : '') +
+      (st.qrImage ? '<div class="inv-bank-qr">' +
+        '<img src="' + E(st.qrImage) + '" alt="Mã QR chuyển khoản">' +
+        '<div class="qr-cap">Quét để chuyển khoản</div>' +
+      '</div>' : '') +
+    '</div>';
+  }
 
-        '<div class="inv-sign">' +
-          '<div><div class="lbl">Người nộp tiền</div><div class="sign-line">(Ký, ghi rõ họ tên)</div></div>' +
-          '<div><div class="lbl">Người thu tiền</div><div class="sign-line">(Ký, ghi rõ họ tên)</div>' +
-            (st.teacherName ? '<div class="sign-name">' + E(st.teacherName) + '</div>' : '') + '</div>' +
-        '</div>' +
-      '</section>';
+  function signHtml() {
+    var st = Store.get().settings;
+    return '<div class="inv-sign">' +
+      '<div><div class="lbl">Người nộp tiền</div><div class="sign-line">(Ký, ghi rõ họ tên)</div></div>' +
+      '<div><div class="lbl">Người thu tiền</div><div class="sign-line">(Ký, ghi rõ họ tên)</div>' +
+        (st.teacherName ? '<div class="sign-name">' + E(st.teacherName) + '</div>' : '') + '</div>' +
+    '</div>';
+  }
+
+  function sheetHtml(sessions, meta) {
+    var total = totalOf(sessions);
+    return '<section class="invoice-sheet">' +
+      headHtml(meta) +
+      tableHtml(sessions, { emptyText: meta.emptyText }) +
+      wordsHtml(total) +
+      skippedHtml(sessions) +
+      (meta.withReview === false ? '' : reviewHtml(sessions)) +
+      bankHtml(total) +
+      signHtml() +
+    '</section>';
   }
 
   /* Gộp các buổi thành 1 hóa đơn duy nhất. */
@@ -213,6 +254,101 @@ var Invoice = (function () {
         period: opts.period || periodLabel(g),
         payerName: g[0].className + (g[0].student ? ' (' + g[0].student + ')' : ''),
         payerNote: opts.payerNote || '',
+        withReview: opts.withReview
+      });
+    }).join('');
+  }
+
+  /* Nhãn kỳ thu từ danh sách tháng: ['2026-07','2026-09'] -> "Tháng 7, 9/2026" */
+  function monthsLabel(months) {
+    var theoNam = {};
+    months.slice().sort().forEach(function (m) {
+      var nam = m.slice(0, 4);
+      (theoNam[nam] = theoNam[nam] || []).push(Number(m.slice(5)));
+    });
+    return Object.keys(theoNam).sort().map(function (nam) {
+      return 'Tháng ' + theoNam[nam].join(', ') + '/' + nam;
+    }).join(' · ');
+  }
+
+  function monthBlockHtml(g) {
+    if (!g.sessions.length) {
+      return '<div class="inv-month is-empty">' +
+        '<div class="inv-month-head"><b>' + E(g.label) + '</b></div>' +
+        '<div class="inv-month-empty">Tháng này không có buổi học nào.</div>' +
+      '</div>';
+    }
+    return '<div class="inv-month">' +
+      '<div class="inv-month-head"><b>' + E(g.label) + '</b></div>' +
+      tableHtml(g.sessions, { totalLabel: 'CỘNG THÁNG' }) +
+    '</div>';
+  }
+
+  /* groups: [{ ym, label, sessions }] — tháng không có buổi vẫn giữ trong danh sách */
+  function multiMonth(groups, opts) {
+    opts = opts || {};
+    var all = [];
+    groups.forEach(function (g) { all = all.concat(g.sessions); });
+    var total = totalOf(all);
+    var coDayGroups = groups.filter(function (g) { return g.sessions.length; });
+
+    var names = [];
+    all.forEach(function (s) {
+      var label = s.className + (s.student ? ' (' + s.student + ')' : '');
+      if (names.indexOf(label) === -1) names.push(label);
+    });
+
+    var meta = {
+      title: opts.title,
+      invoiceNo: opts.invoiceNo || (all.length ? invoiceNo(all) :
+        (Store.get().settings.invoicePrefix || 'HD') + '-' + groups[0].ym.replace('-', '')),
+      period: opts.period || monthsLabel(groups.map(function (g) { return g.ym; })),
+      payerName: opts.payerName || names.join(' · ') || '—',
+      payerNote: opts.payerNote || ''
+    };
+
+    return '<section class="invoice-sheet">' +
+      headHtml(meta) +
+      groups.map(monthBlockHtml).join('') +
+      '<div class="inv-grand">' +
+        '<span class="gt-left">Cộng ' + groups.length + ' tháng' +
+          (coDayGroups.length !== groups.length
+            ? ' <span class="muted">(' + coDayGroups.length + ' tháng có buổi học)</span>' : '') +
+          ' · <b>' + billable(all).length + '</b> buổi · <b>' +
+          Utils.formatHours(totalHours(all)) + '</b></span>' +
+        '<span class="gt-lbl">TỔNG CỘNG</span>' +
+        '<span class="gt-total">' + Utils.formatMoney(total) + ' đ</span>' +
+      '</div>' +
+      wordsHtml(total) +
+      skippedHtml(all) +
+      (opts.withReview === false ? '' : reviewMultiHtml(groups)) +
+      bankHtml(total) +
+      signHtml() +
+    '</section>';
+  }
+
+  /* Mỗi tháng một tờ riêng, in ra là mỗi tháng một trang */
+  function perMonth(groups, opts) {
+    opts = opts || {};
+    /* Tên người nộp lấy chung cho cả lần xuất, để tờ của tháng rỗng không bị bỏ trống */
+    var names = [];
+    groups.forEach(function (g) {
+      g.sessions.forEach(function (s) {
+        var label = s.className + (s.student ? ' (' + s.student + ')' : '');
+        if (names.indexOf(label) === -1) names.push(label);
+      });
+    });
+    var payer = opts.payerName || names.join(' · ') || '—';
+
+    return groups.map(function (g) {
+      return sheetHtml(g.sessions, {
+        title: opts.title,
+        invoiceNo: g.sessions.length ? invoiceNo(g.sessions)
+          : (Store.get().settings.invoicePrefix || 'HD') + '-' + g.ym.replace('-', ''),
+        period: g.label,
+        payerName: payer,
+        payerNote: opts.payerNote || '',
+        emptyText: 'Tháng này không có buổi học nào',
         withReview: opts.withReview
       });
     }).join('');
@@ -262,6 +398,7 @@ var Invoice = (function () {
 
   return {
     single: single, perClass: perClass, csv: csv, download: download, invoiceNo: invoiceNo,
+    multiMonth: multiMonth, perMonth: perMonth, monthsLabel: monthsLabel,
     totalOf: totalOf, billable: billable, periodLabel: periodLabel, totalHours: totalHours,
     monthReview: monthReview
   };
